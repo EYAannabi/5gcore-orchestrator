@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5G Core Orchestrator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans antialiased">
+
+    <nav class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold tracking-tight text-blue-400 flex items-center gap-2">
+            🚀 5G Cloud-Native Orchestrator
+        </h1>
+        <div id="api-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            API Connectée
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6 space-y-6">
+        
+        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
+            <h2 class="text-lg font-semibold mb-4 text-gray-300">Orchestration du Cœur</h2>
+            <div class="flex gap-4">
+                <button onclick="triggerAction('/core/deploy', 'POST')" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-lg transition-all shadow-lg shadow-blue-600/20 active:scale-98 cursor-pointer">
+                    🚀 Déployer Free5GC
+                </button>
+                <button onclick="triggerAction('/core/clean', 'DELETE')" class="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30 font-medium px-5 py-2.5 rounded-lg transition-all active:scale-98 cursor-pointer">
+                    🗑️ Nettoyer le Cluster
+                </button>
+            </div>
+            <div id="console-output" class="mt-4 p-3 bg-gray-950 rounded-lg text-sm font-mono text-gray-400 hidden max-h-40 overflow-y-auto"></div>
+        </div>
+
+        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
+            <h2 class="text-lg font-semibold mb-3 text-gray-300">État de l'Infrastructure Node</h2>
+            <div id="node-container" class="text-sm text-gray-400">Chargement...</div>
+        </div>
+
+        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-300">Supervision des Fonctions Réseau (Pods)</h2>
+                <button onclick="fetchStatus()" class="text-sm bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-1.5 rounded-md transition-all cursor-pointer">
+                    🔄 Actualiser
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-400">
+                    <thead class="bg-gray-700/50 text-gray-300 uppercase text-xs tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3">Composant / Pod</th>
+                            <th class="px-4 py-3">Statut</th>
+                            <th class="px-4 py-3">IP Interne</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pods-table" class="divide-y divide-gray-700">
+                        <tr>
+                            <td colspan="4" class="px-4 py-4 text-center">Aucun pod détecté. Déployez le cœur 5G.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+
+        async function fetchStatus() {
+            try {
+                // 1. Récupérer les Pods
+                const resPods = await fetch(`${API_URL}/status/pods`);
+                const dataPods = await resPods.json();
+                const table = document.getElementById('pods-table');
+                table.innerHTML = '';
+
+                if(dataPods.pods && dataPods.pods.length > 0) {
+                    dataPods.pods.forEach(pod => {
+                        const isRunning = pod.status === 'Running';
+                        const badgeColor = isRunning ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                        
+                        table.innerHTML += `
+                            <tr class="hover:bg-gray-700/30 transition-colors">
+                                <td class="px-4 py-3.5 font-medium text-gray-200">${pod.name}</td>
+                                <td class="px-4 py-3.5">
+                                    <span class="px-2 py-0.5 text-xs font-semibold rounded-full border ${badgeColor}">${pod.status}</span>
+                                </td>
+                                <td class="px-4 py-3.5 font-mono text-xs">${pod.ip || 'N/A'}</td>
+                                <td class="px-4 py-3.5 text-right">
+                                    <button onclick="restartPod('${pod.name}')" class="text-xs bg-gray-700 hover:bg-red-900/40 hover:text-red-400 border border-gray-600 hover:border-red-500/30 px-2.5 py-1 rounded transition-all cursor-pointer">
+                                        🔄 Redémarrer
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    table.innerHTML = `<tr><td colspan="4" class="px-4 py-4 text-center">Aucun pod actif dans le namespace free5gc.</td></tr>`;
+                }
+
+                // 2. Récupérer le Node
+                const resNode = await fetch(`${API_URL}/status/node`);
+                const dataNode = await resNode.json();
+                const nodeBox = document.getElementById('node-container');
+                if(dataNode.node && dataNode.node.length > 0) {
+                    const n = dataNode.node[0];
+                    nodeBox.innerHTML = `
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                            <div><span class="text-gray-500 block text-xs uppercase">Hôte</span> <strong class="text-gray-200">${n.hostname}</strong></div>
+                            <div><span class="text-gray-500 block text-xs uppercase">Système</span> <span class="text-gray-200">${n.os}</span></div>
+                            <div><span class="text-gray-500 block text-xs uppercase">Noyau Linux</span> <span class="font-mono text-gray-200">${n.kernel}</span></div>
+                            <div><span class="text-gray-500 block text-xs uppercase">Capacité CPU / RAM</span> <span class="text-gray-200">${n.cpu_capacity} vCPU / ${(parseInt(n.memory_capacity)/1024/1024).toFixed(1)} GB</span></div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error("Erreur de synchronisation API:", err);
+            }
+        }
+
+        async function triggerAction(endpoint, method) {
+            const consoleBox = document.getElementById('console-output');
+            consoleBox.classList.remove('hidden');
+            consoleBox.innerText = "⏳ Requête transmise à l'orchestrateur, veuillez patienter...";
+            try {
+                const res = await fetch(`${API_URL}${endpoint}`, { method: method });
+                const data = await res.json();
+                consoleBox.innerText = JSON.stringify(data, null, 2);
+                setTimeout(fetchStatus, 3000);
+            } catch (err) {
+                consoleBox.innerText = `Erreur: ${err.message}`;
+            }
+        }
+
+        async function restartPod(name) {
+            if(confirm(`Forcer le redémarrage du composant ${name} ?`)) {
+                try {
+                    await fetch(`${API_URL}/status/restart/${name}`, { method: 'POST' });
+                    fetchStatus();
+                } catch(err) { alert(err.message); }
+            }
+        }
+
+        // Chargement initial et boucle de rafraîchissement
+        fetchStatus();
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>
