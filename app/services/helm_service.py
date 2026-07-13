@@ -237,6 +237,149 @@ def build_helm_values(config) -> Dict[str, str]:
     return values
 
 
+def upgrade_release(
+    deployment_name: str = "free5gc-helm",
+    namespace: str = "free5gc",
+    chart_path: Optional[str] = None,
+    values: Optional[Dict[str, Any]] = None
+) -> Tuple[bool, str, str, Optional[int]]:
+    """
+    Upgrade a Free5GC Helm release with new values.
+    
+    Args:
+        deployment_name: Release name to upgrade
+        namespace: Kubernetes namespace
+        chart_path: Path to Helm chart
+        values: New values to apply
+        
+    Returns:
+        Tuple of (success: bool, stdout: str, stderr: str, new_revision: Optional[int])
+    """
+    try:
+        if chart_path is None:
+            chart_path = os.path.expanduser("~/free5gc-helm/charts/free5gc")
+        
+        cmd = ["helm", "upgrade", deployment_name, chart_path]
+        cmd.extend(["--namespace", namespace])
+        
+        if values:
+            for key, value in values.items():
+                cmd.extend(["--set", f"{key}={_format_helm_value(value)}"])
+        
+        logger.info(f"Executing Helm upgrade: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            # Extract new revision from output
+            new_revision = None
+            if "release upgraded successfully" in result.stdout.lower():
+                # Parse revision from output if available
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'revision' in line.lower():
+                        try:
+                            parts = line.split()
+                            new_revision = int(parts[-1])
+                        except:
+                            pass
+            
+            logger.info(f"Successfully upgraded {deployment_name} in namespace {namespace}")
+            return True, result.stdout, result.stderr, new_revision
+        else:
+            error_msg = f"Helm upgrade failed: {result.stderr}"
+            logger.error(error_msg)
+            return False, result.stdout, error_msg, None
+            
+    except subprocess.TimeoutExpired:
+        error = "Helm upgrade timed out after 5 minutes"
+        logger.error(error)
+        return False, "", error, None
+    except Exception as e:
+        error = f"Error during Helm upgrade: {str(e)}"
+        logger.error(error)
+        return False, "", error, None
+
+
+def rollback_release(
+    deployment_name: str = "free5gc-helm",
+    namespace: str = "free5gc",
+    revision: Optional[int] = None
+) -> Tuple[bool, str, str]:
+    """
+    Rollback a Helm release to a previous version.
+    
+    Args:
+        deployment_name: Release name to rollback
+        namespace: Kubernetes namespace
+        revision: Target revision (None = previous revision)
+        
+    Returns:
+        Tuple of (success: bool, stdout: str, stderr: str)
+    """
+    try:
+        cmd = ["helm", "rollback", deployment_name]
+        if revision is not None:
+            cmd.append(str(revision))
+        cmd.extend(["--namespace", namespace])
+        
+        logger.info(f"Executing Helm rollback: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode == 0:
+            logger.info(f"Successfully rolled back {deployment_name} in namespace {namespace}")
+            return True, result.stdout, result.stderr
+        else:
+            error_msg = f"Helm rollback failed: {result.stderr}"
+            logger.error(error_msg)
+            return False, result.stdout, error_msg
+            
+    except subprocess.TimeoutExpired:
+        error = "Helm rollback timed out after 2 minutes"
+        logger.error(error)
+        return False, "", error
+    except Exception as e:
+        error = f"Error during Helm rollback: {str(e)}"
+        logger.error(error)
+        return False, "", error
+
+
+def get_release_history(
+    deployment_name: str = "free5gc-helm",
+    namespace: str = "free5gc"
+) -> Tuple[bool, list, str]:
+    """
+    Get Helm release revision history.
+    
+    Args:
+        deployment_name: Release name
+        namespace: Kubernetes namespace
+        
+    Returns:
+        Tuple of (success: bool, revisions: list, error: str)
+    """
+    try:
+        cmd = ["helm", "history", deployment_name, "--namespace", namespace, "-o", "json"]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            import json
+            revisions = json.loads(result.stdout)
+            logger.info(f"Retrieved history for {deployment_name}")
+            return True, revisions, ""
+        else:
+            error_msg = f"Could not retrieve history: {result.stderr}"
+            logger.warning(error_msg)
+            return False, [], error_msg
+            
+    except Exception as e:
+        error = f"Error getting release history: {e}"
+        logger.error(error)
+        return False, [], error
+
+
 def _format_helm_value(value: Any) -> str:
     """
     Format Python value for Helm --set parameter.

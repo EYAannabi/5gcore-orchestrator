@@ -1,0 +1,351 @@
+"""
+Deployment lifecycle management routes.
+Handles upgrade, scale, restart, rollback, and parameter modification operations.
+"""
+
+import logging
+import time
+from datetime import datetime
+from fastapi import APIRouter, HTTPException
+from app.models.history import (
+    ScaleRequest, RestartRequest, RollbackRequest, OperationHistory,
+    OperationStatus, OperationType, DeploymentRevision
+)
+from app.models.deployment import DeploymentResponse
+from app.services import helm_service, kubernetes_service, history_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/core", tags=["Lifecycle Management"])
+
+
+@router.post("/upgrade", response_model=DeploymentResponse)
+async def upgrade_deployment(
+    deployment_name: str,
+    namespace: str = "free5gc",
+    values: dict = None
+):
+    """
+    Upgrade a Free5GC Helm release to a new version or with new parameters.
+    
+    Query Parameters:
+        deployment_name: Name of deployment to upgrade
+        namespace: Kubernetes namespace
+        values: Dictionary of Helm values to update
+        
+    Returns:
+        Deployment status after upgrade
+    """
+    try:
+        logger.info(f"Starting upgrade for {deployment_name} in namespace {namespace}")
+        start_time = time.time()
+        
+        # Perform Helm upgrade
+        success, stdout, stderr, new_revision = helm_service.upgrade_release(
+            deployment_name=deployment_name,
+            namespace=namespace,
+            values=values
+        )
+        
+        duration = time.time() - start_time
+        
+        # Record operation in history
+        operation = OperationHistory(
+            operation_type=OperationType.UPGRADE,
+            deployment_name=deployment_name,
+            namespace=namespace,
+            status=OperationStatus.SUCCESS if success else OperationStatus.FAILED,
+            parameters=values or {},
+            result=stdout,
+            error_message=stderr if not success else None,
+            duration_seconds=duration,
+            helm_revision=new_revision
+        )
+        history_service.log_operation(operation)
+        
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Upgrade failed: {stderr}"
+            )
+        
+        return DeploymentResponse(
+            status="success",
+            message=f"Upgraded {deployment_name} successfully",
+            deployment_name=deployment_name,
+            namespace=namespace,
+            output=stdout
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error upgrading deployment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/scale", response_model=DeploymentResponse)
+async def scale_network_function(request: ScaleRequest):
+    """
+    Scale a specific network function (NF) to a new replica count.
+    
+    Supports: amf, smf, upf, ausf, nssf, pcf, udm, udr
+    
+    Example:
+        {
+            "network_function": "upf",
+            "replicas": 3,
+            "deployment_name": "free5gc-helm",
+            "namespace": "free5gc"
+        }
+    """
+    try:
+        logger.info(f"Scaling {request.network_function} to {request.replicas} replicas")
+        start_time = time.time()
+        
+        # Build deployment name for the NF
+        nf_deployment_name = f"{request.deployment_name}-{request.network_function}"
+        
+        # Scale the deployment
+        success, message = kubernetes_service.scale_deployment(
+            deployment_name=nf_deployment_name,
+            replicas=request.replicas,
+            namespace=request.namespace
+        )
+        
+        duration = time.time() - start_time
+        
+        # Record operation
+        operation = OperationHistory(
+            operation_type=OperationType.SCALE,
+            deployment_name=request.deployment_name,
+            namespace=request.namespace,
+            status=OperationStatus.SUCCESS if success else OperationStatus.FAILED,
+            parameters={
+                "network_function": request.network_function,
+                "target_replicas": request.replicas
+            },
+            result=message,
+            error_message=None if success else message,
+            duration_seconds=duration
+        )
+        history_service.log_operation(operation)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=message)
+        
+        return DeploymentResponse(
+            status="success",
+            message=message,
+            deployment_name=request.deployment_name,
+            namespace=request.namespace
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error scaling NF: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/restart", response_model=DeploymentResponse)
+async def restart_network_function(request: RestartRequest):
+    """
+    Restart a network function by triggering a rollout restart.
+    Causes all pods of the NF to be recreated.
+    
+    Supports: amf, smf, upf, ausf, nssf, pcf, udm, udr, webui
+    
+    Example:
+        {
+            "network_function": "amf",
+            "deployment_name": "free5gc-helm",
+            "namespace": "free5gc"
+        }
+    """
+    try:
+        logger.info(f"Restarting {request.network_function}")
+        start_time = time.time()
+        
+        # Build deployment name for the NF
+        nf_deployment_name = f"{request.deployment_name}-{request.network_function}"
+        
+        # Restart the deployment
+        success, message = kubernetes_service.restart_deployment(
+            deployment_name=nf_deployment_name,
+            namespace=request.namespace
+        )
+        
+        duration = time.time() - start_time
+        
+        # Record operation
+        operation = OperationHistory(
+            operation_type=OperationType.RESTART,
+            deployment_name=request.deployment_name,
+            namespace=request.namespace,
+            status=OperationStatus.SUCCESS if success else OperationStatus.FAILED,
+            parameters={"network_function": request.network_function},
+            result=message,
+            error_message=None if success else message,
+            duration_seconds=duration
+        )
+        history_service.log_operation(operation)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=message)
+        
+        return DeploymentResponse(
+            status="success",
+            message=message,
+            deployment_name=request.deployment_name,
+            namespace=request.namespace
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restarting NF: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rollback", response_model=DeploymentResponse)
+async def rollback_deployment(request: RollbackRequest):
+    """
+    Rollback a Helm release to a previous revision.
+    
+    Example without specific revision (rolls back 1 step):
+        {
+            "deployment_name": "free5gc-helm",
+            "namespace": "free5gc"
+        }
+        
+    Example with specific revision:
+        {
+            "deployment_name": "free5gc-helm",
+            "namespace": "free5gc",
+            "revision": 1
+        }
+    """
+    try:
+        logger.info(f"Rolling back {request.deployment_name} to revision {request.revision or 'previous'}")
+        start_time = time.time()
+        
+        # Get current revision before rollback
+        history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
+        current_revision = None
+        if history and len(history) > 0:
+            current_revision = history[0].get("revision")
+        
+        # Perform rollback
+        success, stdout, stderr = helm_service.rollback_release(
+            deployment_name=request.deployment_name,
+            namespace=request.namespace,
+            revision=request.revision
+        )
+        
+        duration = time.time() - start_time
+        
+        # Get new revision after rollback
+        new_history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
+        new_revision = None
+        if new_history and len(new_history) > 0:
+            new_revision = new_history[0].get("revision")
+        
+        # Record operation
+        operation = OperationHistory(
+            operation_type=OperationType.ROLLBACK,
+            deployment_name=request.deployment_name,
+            namespace=request.namespace,
+            status=OperationStatus.SUCCESS if success else OperationStatus.FAILED,
+            parameters={"target_revision": request.revision or "previous"},
+            result=stdout,
+            error_message=stderr if not success else None,
+            duration_seconds=duration,
+            helm_revision=new_revision,
+            previous_revision=current_revision
+        )
+        history_service.log_operation(operation)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=stderr)
+        
+        return DeploymentResponse(
+            status="success",
+            message=f"Rolled back {request.deployment_name} successfully",
+            deployment_name=request.deployment_name,
+            namespace=request.namespace,
+            output=stdout
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rolling back deployment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/revisions", tags=["Lifecycle Management"])
+async def get_deployment_revisions(
+    deployment_name: str,
+    namespace: str = "free5gc"
+):
+    """
+    Get Helm release revision history for a deployment.
+    Shows all previous versions and their deployment dates.
+    """
+    try:
+        success, revisions, error = helm_service.get_release_history(deployment_name, namespace)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=error)
+        
+        # Convert to DeploymentRevision objects
+        revision_objects = []
+        for rev in revisions:
+            try:
+                revision_obj = DeploymentRevision(
+                    revision=rev.get("revision"),
+                    app_version=rev.get("app_version"),
+                    status=rev.get("status"),
+                    updated=datetime.fromisoformat(rev.get("updated").replace("Z", "+00:00")) if rev.get("updated") else datetime.utcnow(),
+                    description=rev.get("description"),
+                    deployment_name=deployment_name
+                )
+                revision_objects.append(revision_obj)
+            except Exception as e:
+                logger.warning(f"Could not parse revision: {e}")
+        
+        return {
+            "deployment_name": deployment_name,
+            "namespace": namespace,
+            "revisions": revision_objects,
+            "total": len(revision_objects)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting revisions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/parameters", tags=["Lifecycle Management"])
+async def get_deployment_parameters(
+    deployment_name: str,
+    namespace: str = "free5gc"
+):
+    """
+    Get current deployment parameters (Helm values).
+    Shows all customized settings for the deployment.
+    """
+    try:
+        values = helm_service.get_helm_values(deployment_name, namespace)
+        
+        if not values:
+            raise HTTPException(status_code=404, detail="Deployment not found")
+        
+        return {
+            "deployment_name": deployment_name,
+            "namespace": namespace,
+            "parameters": values
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting parameters: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.routes import pods, deploy, logs, settings
+from app.routes import pods, deploy, logs, settings, lifecycle, validations, history
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +42,9 @@ app.include_router(pods.router, prefix="/api")
 app.include_router(deploy.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(lifecycle.router, prefix="/api")
+app.include_router(validations.router, prefix="/api")
+app.include_router(history.router, prefix="/api")
 
 # Mount static files for frontend
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

@@ -7,7 +7,7 @@ pydantic-core==2.14.1
 
 # Kubernetes Python Client
 kubernetes==28.1.0
-urllib3==2.1.0
+urllib3>=1.24.2,<2.0
 
 # HTTP and Networking
 requests==2.31.0

@@ -250,6 +250,115 @@ def _calculate_age(creation_timestamp) -> str:
         return "Unknown"
 
 
+def scale_deployment(
+    deployment_name: str,
+    replicas: int,
+    namespace: str = "free5gc"
+) -> Tuple[bool, str]:
+    """
+    Scale a Kubernetes deployment to a specific number of replicas.
+    
+    Args:
+        deployment_name: Name of the deployment to scale
+        replicas: Target number of replicas
+        namespace: Kubernetes namespace
+        
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    try:
+        deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+        deployment.spec.replicas = replicas
+        apps_v1.patch_namespaced_deployment(deployment_name, namespace, deployment)
+        message = f"Scaled deployment '{deployment_name}' to {replicas} replicas"
+        logger.info(message)
+        return True, message
+    except ApiException as e:
+        if e.status == 404:
+            message = f"Deployment '{deployment_name}' not found in namespace '{namespace}'"
+        else:
+            message = f"Failed to scale deployment: {e.reason}"
+        logger.error(message)
+        return False, message
+    except Exception as e:
+        message = f"Error scaling deployment: {str(e)}"
+        logger.error(message)
+        return False, message
+
+
+def restart_deployment(
+    deployment_name: str,
+    namespace: str = "free5gc"
+) -> Tuple[bool, str]:
+    """
+    Restart a deployment by triggering a rollout restart (pod recreation).
+    
+    Args:
+        deployment_name: Name of the deployment to restart
+        namespace: Kubernetes namespace
+        
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    try:
+        deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
+        
+        # Trigger a rollout restart by updating pod spec annotation
+        deployment.spec.template.metadata.annotations = deployment.spec.template.metadata.annotations or {}
+        deployment.spec.template.metadata.annotations['kubectl.kubernetes.io/restartedAt'] = datetime.now().isoformat()
+        
+        apps_v1.patch_namespaced_deployment(deployment_name, namespace, deployment)
+        message = f"Restarted deployment '{deployment_name}'"
+        logger.info(message)
+        return True, message
+    except ApiException as e:
+        if e.status == 404:
+            message = f"Deployment '{deployment_name}' not found in namespace '{namespace}'"
+        else:
+            message = f"Failed to restart deployment: {e.reason}"
+        logger.error(message)
+        return False, message
+    except Exception as e:
+        message = f"Error restarting deployment: {str(e)}"
+        logger.error(message)
+        return False, message
+
+
+def wait_for_pods(
+    namespace: str = "free5gc",
+    expected_count: int = 1,
+    timeout_seconds: int = 300
+) -> Tuple[bool, int]:
+    """
+    Wait for a specific number of pods to be in Running state.
+    
+    Args:
+        namespace: Kubernetes namespace
+        expected_count: Expected number of Running pods
+        timeout_seconds: Maximum time to wait
+        
+    Returns:
+        Tuple of (success: bool, actual_count: int)
+    """
+    import time
+    start_time = datetime.utcnow()
+    
+    while True:
+        pods = list_pods(namespace)
+        running_count = sum(1 for pod in pods if pod["status"] == "Running")
+        
+        if running_count >= expected_count:
+            logger.info(f"Found {running_count} running pods in namespace {namespace}")
+            return True, running_count
+        
+        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        if elapsed > timeout_seconds:
+            logger.warning(f"Timeout waiting for {expected_count} running pods. Current: {running_count}")
+            return False, running_count
+        
+        time.sleep(5)  # Check every 5 seconds
+
+
 def delete_specific_pod(pod_name: str, namespace: str = "free5gc") -> Tuple[bool, str]:
     """
     Delete a specific pod (triggers automatic restart via Kubernetes).
@@ -361,40 +470,3 @@ def check_deployment_status(namespace: str = "free5gc") -> Dict[str, Any]:
             "pods_failed": 0,
             "error": str(e)
         }
-
-
-def _calculate_age(creation_timestamp) -> str:
-    """
-    Calculate how long a pod has been running.
-    
-    Args:
-        creation_timestamp: Pod creation timestamp from Kubernetes
-        
-    Returns:
-        Human-readable age string
-    """
-    try:
-        if creation_timestamp is None:
-            return "Unknown"
-        
-        # Handle timezone-aware datetime
-        if creation_timestamp.tzinfo is not None:
-            age_delta = datetime.now(creation_timestamp.tzinfo) - creation_timestamp
-        else:
-            age_delta = datetime.utcnow() - creation_timestamp
-        
-        total_seconds = int(age_delta.total_seconds())
-        
-        if total_seconds < 60:
-            return f"{total_seconds}s"
-        elif total_seconds < 3600:
-            return f"{total_seconds // 60}m"
-        elif total_seconds < 86400:
-            return f"{total_seconds // 3600}h"
-        else:
-            days = total_seconds // 86400
-            hours = (total_seconds % 86400) // 3600
-            return f"{days}d {hours}h"
-    except Exception as e:
-        logger.warning(f"Error calculating pod age: {e}")
-        return "Unknown"
