@@ -414,8 +414,11 @@
                 <ul class="nav-menu">
                     <li><a class="nav-link active" onclick="showPage('dashboard')">📊 Dashboard</a></li>
                     <li><a class="nav-link" onclick="showPage('deployment')">🚀 Deployment</a></li>
+                    <li><a class="nav-link" onclick="showPage('lifecycle')">⚡ Lifecycle Mgmt</a></li>
+                    <li><a class="nav-link" onclick="showPage('tests')">✅ Validation Tests</a></li>
                     <li><a class="nav-link" onclick="showPage('pods')">📦 Pods</a></li>
                     <li><a class="nav-link" onclick="showPage('logs')">📝 Logs</a></li>
+                    <li><a class="nav-link" onclick="showPage('history')">📜 History & Audit</a></li>
                     <li><a class="nav-link" onclick="showPage('settings')">⚙️ Settings</a></li>
                 </ul>
             </nav>
@@ -552,6 +555,271 @@
                                 <button type="reset" class="btn btn-secondary">↻ Reset</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <!-- Lifecycle Management Page -->
+                <div class="page" id="lifecycle">
+                    <div class="card">
+                        <div class="card-title">⚡ Lifecycle Management - Zero-Downtime Operations</div>
+                        <div style="margin-bottom: 24px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 4px;">
+                            <div style="font-size: 14px; color: var(--success); font-weight: 600;">✅ Zero-Downtime Mode Enabled</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">All operations preserve deployment availability</div>
+                        </div>
+
+                        <!-- Tabs -->
+                        <div style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--border);">
+                            <button class="btn btn-secondary" onclick="switchTab('tab-upgrade')" style="border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px;">📦 Upgrade</button>
+                            <button class="btn btn-secondary" onclick="switchTab('tab-scale')" style="border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px;">📈 Scale</button>
+                            <button class="btn btn-secondary" onclick="switchTab('tab-restart')" style="border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px;">🔄 Restart</button>
+                            <button class="btn btn-secondary" onclick="switchTab('tab-rollback')" style="border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px;">⏮️ Rollback</button>
+                        </div>
+
+                        <!-- Upgrade Tab -->
+                        <div id="tab-upgrade" class="tab-content">
+                            <h3 style="margin-bottom: 16px;">📦 Upgrade Deployment</h3>
+                            <form id="upgradeForm" onsubmit="submitUpgrade(event)">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">Deployment Name *</label>
+                                        <input type="text" class="form-input" name="deployment_name" placeholder="free5gc-helm" value="free5gc-helm" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Namespace *</label>
+                                        <input type="text" class="form-input" name="namespace" placeholder="free5gc" value="free5gc" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">MCC</label>
+                                        <input type="text" class="form-input" name="mcc" placeholder="208" maxlength="3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">MNC</label>
+                                        <input type="text" class="form-input" name="mnc" placeholder="93" maxlength="3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Subscribers</label>
+                                        <input type="number" class="form-input" name="num_subscribers" value="10" min="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">UPF Replicas</label>
+                                        <input type="number" class="form-input" name="num_upf_replicas" value="1" min="1" max="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">SMF Replicas</label>
+                                        <input type="number" class="form-input" name="num_smf_replicas" value="1" min="1" max="10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">AMF Replicas</label>
+                                        <input type="number" class="form-input" name="num_amf_replicas" value="1" min="1" max="10">
+                                    </div>
+                                </div>
+                                <div id="upgradeProgress" style="display: none; margin-top: 24px;">
+                                    <div class="form-label">Upgrade Progress</div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div id="upgradeProgressText" style="font-size: 12px; color: var(--text-secondary);">Starting upgrade...</div>
+                                </div>
+                                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                    <button type="submit" class="btn btn-primary">📦 Upgrade</button>
+                                    <button type="reset" class="btn btn-secondary">↻ Reset</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Scale Tab -->
+                        <div id="tab-scale" class="tab-content" style="display: none;">
+                            <h3 style="margin-bottom: 16px;">📈 Scale Network Function</h3>
+                            <form id="scaleForm" onsubmit="submitScale(event)">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">Network Function *</label>
+                                        <select class="form-select" name="network_function" required>
+                                            <option value="">-- Select NF --</option>
+                                            <option value="amf">AMF - Access and Mobility Function</option>
+                                            <option value="smf">SMF - Session Management Function</option>
+                                            <option value="upf">UPF - User Plane Function</option>
+                                            <option value="ausf">AUSF - Authentication Server Function</option>
+                                            <option value="nssf">NSSF - Network Slice Selection Function</option>
+                                            <option value="pcf">PCF - Policy Control Function</option>
+                                            <option value="udm">UDM - Unified Data Management</option>
+                                            <option value="udr">UDR - Unified Data Repository</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Replicas *</label>
+                                        <input type="number" class="form-input" name="replicas" value="2" min="1" max="10" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Deployment Name *</label>
+                                        <input type="text" class="form-input" name="deployment_name" placeholder="free5gc-helm" value="free5gc-helm" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Namespace *</label>
+                                        <input type="text" class="form-input" name="namespace" placeholder="free5gc" value="free5gc" required>
+                                    </div>
+                                </div>
+                                <div id="scaleProgress" style="display: none; margin-top: 24px;">
+                                    <div class="form-label">Scale Progress</div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div id="scaleProgressText" style="font-size: 12px; color: var(--text-secondary);">Starting scale operation...</div>
+                                </div>
+                                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                    <button type="submit" class="btn btn-primary">📈 Scale Now</button>
+                                    <button type="reset" class="btn btn-secondary">↻ Reset</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Restart Tab -->
+                        <div id="tab-restart" class="tab-content" style="display: none;">
+                            <h3 style="margin-bottom: 16px;">🔄 Restart Network Function</h3>
+                            <form id="restartForm" onsubmit="submitRestart(event)">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">Network Function *</label>
+                                        <select class="form-select" name="network_function" required>
+                                            <option value="">-- Select NF --</option>
+                                            <option value="amf">AMF - Access and Mobility Function</option>
+                                            <option value="smf">SMF - Session Management Function</option>
+                                            <option value="upf">UPF - User Plane Function</option>
+                                            <option value="ausf">AUSF - Authentication Server Function</option>
+                                            <option value="nssf">NSSF - Network Slice Selection Function</option>
+                                            <option value="pcf">PCF - Policy Control Function</option>
+                                            <option value="udm">UDM - Unified Data Management</option>
+                                            <option value="udr">UDR - Unified Data Repository</option>
+                                            <option value="webui">WebUI - Web User Interface</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Deployment Name *</label>
+                                        <input type="text" class="form-input" name="deployment_name" placeholder="free5gc-helm" value="free5gc-helm" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Namespace *</label>
+                                        <input type="text" class="form-input" name="namespace" placeholder="free5gc" value="free5gc" required>
+                                    </div>
+                                </div>
+                                <div id="restartProgress" style="display: none; margin-top: 24px;">
+                                    <div class="form-label">Restart Progress</div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div id="restartProgressText" style="font-size: 12px; color: var(--text-secondary);">Starting restart operation...</div>
+                                </div>
+                                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                    <button type="submit" class="btn btn-primary">🔄 Restart Now</button>
+                                    <button type="reset" class="btn btn-secondary">↻ Reset</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Rollback Tab -->
+                        <div id="tab-rollback" class="tab-content" style="display: none;">
+                            <h3 style="margin-bottom: 16px;">⏮️ Rollback to Previous Version</h3>
+                            <form id="rollbackForm" onsubmit="submitRollback(event)">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label class="form-label">Deployment Name *</label>
+                                        <input type="text" class="form-input" name="deployment_name" placeholder="free5gc-helm" value="free5gc-helm" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Namespace *</label>
+                                        <input type="text" class="form-input" name="namespace" placeholder="free5gc" value="free5gc" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Target Revision (Optional)</label>
+                                        <input type="number" class="form-input" name="revision" placeholder="Leave empty for previous version" min="0">
+                                    </div>
+                                </div>
+                                <div id="rollbackAvailable" style="display: none; margin-bottom: 20px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px;">
+                                    <div style="font-size: 14px; font-weight: 600; color: var(--primary-light);">Available Revisions:</div>
+                                    <div id="revisionsList" style="margin-top: 8px; font-size: 13px;"></div>
+                                </div>
+                                <div id="rollbackProgress" style="display: none; margin-top: 24px;">
+                                    <div class="form-label">Rollback Progress</div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                    <div id="rollbackProgressText" style="font-size: 12px; color: var(--text-secondary);">Starting rollback operation...</div>
+                                </div>
+                                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                    <button type="button" class="btn btn-secondary" onclick="loadRevisions()">📋 Load Revisions</button>
+                                    <button type="submit" class="btn btn-primary">⏮️ Rollback Now</button>
+                                    <button type="reset" class="btn btn-secondary">↻ Reset</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validation Tests Page -->
+                <div class="page" id="tests">
+                    <div class="card">
+                        <div class="card-title">✅ Validation & Testing Suite</div>
+                        <div style="margin-bottom: 24px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 4px;">
+                            <div style="font-size: 14px; color: var(--success); font-weight: 600;">5 Automated Tests</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Pod Health, AMF Registration, UE Registration, PDU Session, Connectivity</div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">Deployment Name *</label>
+                                <input type="text" class="form-input" id="testDeploymentName" placeholder="free5gc-helm" value="free5gc-helm" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Namespace *</label>
+                                <input type="text" class="form-input" id="testNamespace" placeholder="free5gc" value="free5gc" required>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+                            <button class="btn btn-primary" onclick="runTest('pods')">✅ Pod Health</button>
+                            <button class="btn btn-primary" onclick="runTest('amf')">📡 AMF Registration</button>
+                            <button class="btn btn-primary" onclick="runTest('ue')">📱 UE Registration</button>
+                            <button class="btn btn-primary" onclick="runTest('pdu')">🔗 PDU Session</button>
+                            <button class="btn btn-primary" onclick="runTest('connectivity')">🌐 Connectivity</button>
+                            <button class="btn btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="runTest('all')">🚀 Run All Tests</button>
+                        </div>
+
+                        <div id="testResults" style="display: none; margin-top: 24px;">
+                            <div class="form-label">Test Results</div>
+                            <div id="testResultsContent" style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History & Audit Page -->
+                <div class="page" id="history">
+                    <div class="card">
+                        <div class="card-title">📜 Operation History & Audit Trail</div>
+                        <div style="margin-bottom: 24px;">
+                            <button class="btn btn-primary" onclick="loadOperationHistory()">🔄 Refresh History</button>
+                        </div>
+                        <div id="historyContent" style="overflow-x: auto;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Operation</th>
+                                        <th>Deployment</th>
+                                        <th>Status</th>
+                                        <th>Duration</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTable">
+                                    <tr><td colspan="6">Loading history...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-title">📊 Platform Statistics</div>
+                        <div id="statsContent" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;"></div>
                     </div>
                 </div>
 
@@ -863,6 +1131,288 @@
         function executeConfirmedAction() {
             closeModal();
             if (pendingAction) pendingAction();
+        }
+
+        // ========== Lifecycle Management Functions ==========
+        
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            // Show selected tab
+            document.getElementById(tabName).style.display = 'block';
+            // Update button styles
+            document.querySelectorAll('button[onclick^="switchTab"]').forEach(btn => {
+                btn.style.borderBottomColor = 'transparent';
+            });
+            event.target.style.borderBottomColor = 'var(--primary)';
+        }
+
+        async function submitUpgrade(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            const values = {};
+            ['mcc', 'mnc', 'num_subscribers', 'num_upf_replicas', 'num_smf_replicas', 'num_amf_replicas'].forEach(key => {
+                const val = formData.get(key);
+                if (val) {
+                    values[key] = isNaN(val) ? val : parseInt(val);
+                }
+            });
+
+            const payload = {
+                deployment_name: formData.get('deployment_name'),
+                namespace: formData.get('namespace'),
+                values: values
+            };
+
+            try {
+                document.getElementById('upgradeProgress').style.display = 'block';
+                const response = await apiCall('/api/core/upgrade?deployment_name=' + payload.deployment_name + '&namespace=' + payload.namespace, 'POST', payload);
+                
+                document.querySelector('#upgradeProgress .progress-fill').style.width = '100%';
+                document.getElementById('upgradeProgressText').textContent = 'Upgrade in progress: Rolling out new configuration...';
+                
+                showNotification('✅ Upgrade initiated! Monitoring deployment...', 'success');
+                setTimeout(() => {
+                    loadOperationHistory();
+                    document.getElementById('upgradeProgress').style.display = 'none';
+                }, 3000);
+            } catch (e) {
+                document.getElementById('upgradeProgress').style.display = 'none';
+                showNotification(`❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function submitScale(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            const payload = {
+                network_function: formData.get('network_function'),
+                replicas: parseInt(formData.get('replicas')),
+                deployment_name: formData.get('deployment_name'),
+                namespace: formData.get('namespace')
+            };
+
+            try {
+                document.getElementById('scaleProgress').style.display = 'block';
+                const response = await apiCall('/api/core/scale', 'POST', payload);
+                
+                document.querySelector('#scaleProgress .progress-fill').style.width = '100%';
+                document.getElementById('scaleProgressText').textContent = `✅ Scaling ${payload.network_function} to ${payload.replicas} replicas (zero-downtime)...`;
+                
+                showNotification(`📈 Scaling ${payload.network_function} to ${payload.replicas} replicas...`, 'success');
+                setTimeout(() => {
+                    loadOperationHistory();
+                    document.getElementById('scaleProgress').style.display = 'none';
+                }, 3000);
+            } catch (e) {
+                document.getElementById('scaleProgress').style.display = 'none';
+                showNotification(`❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function submitRestart(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            const payload = {
+                network_function: formData.get('network_function'),
+                deployment_name: formData.get('deployment_name'),
+                namespace: formData.get('namespace')
+            };
+
+            try {
+                showConfirmModal(`Restart ${payload.network_function}? This will restart pods gracefully.`, 'Confirm Restart', async () => {
+                    document.getElementById('restartProgress').style.display = 'block';
+                    const response = await apiCall('/api/core/restart', 'POST', payload);
+                    
+                    document.querySelector('#restartProgress .progress-fill').style.width = '100%';
+                    document.getElementById('restartProgressText').textContent = `✅ Restarting ${payload.network_function} (pods rolling restart)...`;
+                    
+                    showNotification(`🔄 Restarting ${payload.network_function}...`, 'success');
+                    setTimeout(() => {
+                        loadOperationHistory();
+                        document.getElementById('restartProgress').style.display = 'none';
+                    }, 3000);
+                });
+            } catch (e) {
+                document.getElementById('restartProgress').style.display = 'none';
+                showNotification(`❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function loadRevisions() {
+            try {
+                const deployName = document.querySelector('#rollbackForm input[name="deployment_name"]').value;
+                const namespace = document.querySelector('#rollbackForm input[name="namespace"]').value;
+                
+                const revisions = await apiCall(`/api/core/revisions?deployment_name=${deployName}&namespace=${namespace}`);
+                
+                document.getElementById('rollbackAvailable').style.display = 'block';
+                document.getElementById('revisionsList').innerHTML = revisions
+                    .map(r => `<div>✓ Revision ${r.revision}: ${r.app_version} (${r.status}) - ${r.updated}</div>`)
+                    .join('');
+                    
+                showNotification('✅ Revisions loaded', 'success');
+            } catch (e) {
+                showNotification(`❌ Error loading revisions: ${e.message}`, 'error');
+            }
+        }
+
+        async function submitRollback(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            const payload = {
+                deployment_name: formData.get('deployment_name'),
+                namespace: formData.get('namespace')
+            };
+            
+            const revision = formData.get('revision');
+            if (revision) {
+                payload.revision = parseInt(revision);
+            }
+
+            try {
+                showConfirmModal(`Rollback deployment? This will restore to a previous version with zero-downtime.`, 'Confirm Rollback', async () => {
+                    document.getElementById('rollbackProgress').style.display = 'block';
+                    const response = await apiCall('/api/core/rollback', 'POST', payload);
+                    
+                    document.querySelector('#rollbackProgress .progress-fill').style.width = '100%';
+                    document.getElementById('rollbackProgressText').textContent = `✅ Rollback in progress: Restoring previous version...`;
+                    
+                    showNotification('⏮️ Rollback initiated!', 'success');
+                    setTimeout(() => {
+                        loadOperationHistory();
+                        document.getElementById('rollbackProgress').style.display = 'none';
+                    }, 3000);
+                });
+            } catch (e) {
+                document.getElementById('rollbackProgress').style.display = 'none';
+                showNotification(`❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        // ========== Test Management Functions ==========
+        
+        async function runTest(testType) {
+            const deployName = document.getElementById('testDeploymentName').value;
+            const namespace = document.getElementById('testNamespace').value;
+            
+            if (!deployName || !namespace) {
+                showNotification('❌ Please enter deployment name and namespace', 'error');
+                return;
+            }
+
+            try {
+                let endpoint = '';
+                switch(testType) {
+                    case 'pods': endpoint = '/api/tests/validate-pods'; break;
+                    case 'amf': endpoint = '/api/tests/validate-amf'; break;
+                    case 'ue': endpoint = '/api/tests/validate-ue'; break;
+                    case 'pdu': endpoint = '/api/tests/validate-pdu'; break;
+                    case 'connectivity': endpoint = '/api/tests/validate-connectivity'; break;
+                    case 'all': endpoint = '/api/tests/validate-all'; break;
+                }
+
+                showNotification(testType === 'all' ? '🚀 Running all tests...' : `⏳ Running ${testType} test...`, 'success');
+                
+                const response = await apiCall(endpoint, 'POST', {
+                    namespace: namespace,
+                    deployment_name: deployName
+                });
+
+                document.getElementById('testResults').style.display = 'block';
+                
+                if (testType === 'all') {
+                    // Show full report
+                    document.getElementById('testResultsContent').innerHTML = `
+                        <div style="padding: 16px;">
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">
+                                ${response.overall_status === 'passed' ? '✅' : '⚠️'} Test Report Summary
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                                <div>Passed: <strong style="color: var(--success);">${response.tests_passed}</strong></div>
+                                <div>Failed: <strong style="color: var(--danger);">${response.tests_failed}</strong></div>
+                                <div>Skipped: <strong>${response.tests_skipped}</strong></div>
+                                <div>Total: <strong>${response.tests_total}</strong></div>
+                            </div>
+                            <div>Duration: ${response.total_duration_seconds}s</div>
+                            <div style="margin-top: 12px; padding: 8px; background: rgba(30, 41, 59, 0.5); border-radius: 4px;">
+                                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">${response.summary}</pre>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Show single test result
+                    const status = response.status === 'passed' ? '✅' : response.status === 'failed' ? '❌' : '⚠️';
+                    document.getElementById('testResultsContent').innerHTML = `
+                        <div style="padding: 16px;">
+                            <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">
+                                ${status} ${response.test_name}
+                            </div>
+                            <div>Status: <strong>${response.status}</strong></div>
+                            <div>Duration: ${response.duration_seconds}s</div>
+                            <div style="margin-top: 8px; padding: 8px; background: rgba(30, 41, 59, 0.5); border-radius: 4px;">
+                                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">${JSON.stringify(response.details, null, 2)}</pre>
+                            </div>
+                            ${response.error_message ? `<div style="color: var(--danger); margin-top: 8px;">Error: ${response.error_message}</div>` : ''}
+                        </div>
+                    `;
+                }
+
+                showNotification(`✅ Test${testType === 'all' ? 's' : ''} completed!`, 'success');
+            } catch (e) {
+                showNotification(`❌ Test error: ${e.message}`, 'error');
+            }
+        }
+
+        // ========== History Functions ==========
+        
+        async function loadOperationHistory() {
+            try {
+                const ops = await apiCall('/api/history/operations?limit=20');
+                
+                const tbody = document.getElementById('historyTable');
+                tbody.innerHTML = ops.length === 0 ? '<tr><td colspan="6">No operations recorded</td></tr>' :
+                    ops.map(op => `
+                        <tr>
+                            <td>${new Date(op.timestamp).toLocaleString()}</td>
+                            <td><strong>${op.operation_type}</strong></td>
+                            <td>${op.deployment_name}</td>
+                            <td>
+                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;
+                                    ${op.status === 'success' ? 'background: rgba(16, 185, 129, 0.2); color: var(--success);' : 'background: rgba(239, 68, 68, 0.2); color: var(--danger);'}">
+                                    ${op.status}
+                                </span>
+                            </td>
+                            <td>${op.duration_seconds || 0}s</td>
+                            <td><small>${op.result || op.error_message || '-'}</small></td>
+                        </tr>
+                    `).join('');
+                    
+                // Load stats
+                const stats = await apiCall('/api/history/stats');
+                document.getElementById('statsContent').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.total_operations}</div>
+                        <div class="stat-label">Total Operations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.success_rate}%</div>
+                        <div class="stat-label">Success Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.average_duration_seconds.toFixed(1)}s</div>
+                        <div class="stat-label">Avg Duration</div>
+                    </div>
+                `;
+            } catch (e) {
+                showNotification(`❌ Error loading history: ${e.message}`, 'error');
+            }
         }
 
         // Initialize
