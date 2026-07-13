@@ -300,4 +300,101 @@ def get_pod_logs(
         
     Returns:
         Pod logs as string
-        return f"Impossible de lire les logs : {str(e)}"
+    """
+    try:
+        logs = v1.read_namespaced_pod_log(
+            name=pod_name,
+            namespace=namespace,
+            tail_lines=tail_lines,
+            previous=previous
+        )
+        logger.info(f"Retrieved logs from pod '{pod_name}'")
+        return logs if logs else "No logs available"
+    except ApiException as e:
+        message = f"Failed to retrieve logs: {e.reason}"
+        logger.error(message)
+        return message
+    except Exception as e:
+        message = f"Error retrieving logs: {str(e)}"
+        logger.error(message)
+        return message
+
+
+def check_deployment_status(namespace: str = "free5gc") -> Dict[str, Any]:
+    """
+    Check overall deployment status in the namespace.
+    
+    Args:
+        namespace: Kubernetes namespace
+        
+    Returns:
+        Dictionary with deployment status information
+    """
+    try:
+        pods = list_pods(namespace)
+        
+        if not pods:
+            return {
+                "deployed": False,
+                "pods_total": 0,
+                "pods_running": 0,
+                "pods_failed": 0
+            }
+        
+        pods_running = sum(1 for pod in pods if pod["status"] == "Running")
+        pods_failed = sum(1 for pod in pods if pod["status"] != "Running")
+        
+        return {
+            "deployed": True,
+            "pods_total": len(pods),
+            "pods_running": pods_running,
+            "pods_failed": pods_failed,
+            "pod_list": pods,
+            "node_info": get_node_status()[0] if get_node_status() else None
+        }
+    except Exception as e:
+        logger.error(f"Error checking deployment status: {e}")
+        return {
+            "deployed": False,
+            "pods_total": 0,
+            "pods_running": 0,
+            "pods_failed": 0,
+            "error": str(e)
+        }
+
+
+def _calculate_age(creation_timestamp) -> str:
+    """
+    Calculate how long a pod has been running.
+    
+    Args:
+        creation_timestamp: Pod creation timestamp from Kubernetes
+        
+    Returns:
+        Human-readable age string
+    """
+    try:
+        if creation_timestamp is None:
+            return "Unknown"
+        
+        # Handle timezone-aware datetime
+        if creation_timestamp.tzinfo is not None:
+            age_delta = datetime.now(creation_timestamp.tzinfo) - creation_timestamp
+        else:
+            age_delta = datetime.utcnow() - creation_timestamp
+        
+        total_seconds = int(age_delta.total_seconds())
+        
+        if total_seconds < 60:
+            return f"{total_seconds}s"
+        elif total_seconds < 3600:
+            return f"{total_seconds // 60}m"
+        elif total_seconds < 86400:
+            return f"{total_seconds // 3600}h"
+        else:
+            days = total_seconds // 86400
+            hours = (total_seconds % 86400) // 3600
+            return f"{days}d {hours}h"
+    except Exception as e:
+        logger.warning(f"Error calculating pod age: {e}")
+        return "Unknown"
