@@ -4,7 +4,7 @@ Handles pod management, node information, and cluster status.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -316,6 +316,106 @@ def scale_deployment(
         return False, message
 
 
+def list_deployments(namespace: str = "free5gc") -> List[Dict[str, Any]]:
+    """
+    Retrieve Kubernetes deployments in a namespace.
+
+    Args:
+        namespace: Kubernetes namespace to query
+
+    Returns:
+        List of deployment dictionaries with name and replica information.
+    """
+    try:
+        if not apps_v1:
+            logger.warning("Kubernetes client is not configured; returning no deployments")
+            return []
+
+        deployments = apps_v1.list_namespaced_deployment(namespace=namespace)
+        return [
+            {
+                "name": deployment.metadata.name,
+                "namespace": namespace,
+                "replicas": deployment.spec.replicas or 0,
+                "ready_replicas": deployment.status.ready_replicas or 0,
+                "available_replicas": deployment.status.available_replicas or 0,
+            }
+            for deployment in deployments.items
+        ]
+    except ApiException as e:
+        logger.error(f"Kubernetes API error listing deployments: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Error listing deployments: {e}")
+        return []
+
+
+def find_network_function_deployments(
+    deployment_name: str,
+    network_function: str,
+    namespace: str = "free5gc"
+) -> List[str]:
+    """
+    Find Kubernetes Deployment names for a Free5GC network function.
+
+    Free5GC Helm charts often create names like:
+    free5gc-helm-free5gc-ausf-ausf, not free5gc-helm-ausf.
+    """
+    nf = network_function.lower()
+    release = deployment_name.lower()
+    candidates = []
+
+    for deployment in list_deployments(namespace):
+        name = deployment["name"]
+        lowered = name.lower()
+        tokens = lowered.split("-")
+
+        if release not in lowered:
+            continue
+
+        if nf in tokens or lowered.endswith(f"-{nf}") or f"-{nf}-" in lowered:
+            candidates.append(name)
+
+    def sort_key(name: str):
+        lowered = name.lower()
+        exact_tail = lowered.endswith(f"-{nf}")
+        repeated_component = f"-{nf}-{nf}" in lowered
+        return (not exact_tail, not repeated_component, len(lowered))
+
+    candidates.sort(key=sort_key)
+    return candidates
+
+
+def scale_network_function(
+    deployment_name: str,
+    network_function: str,
+    replicas: int,
+    namespace: str = "free5gc"
+) -> Tuple[bool, str, List[str]]:
+    """Scale all Kubernetes deployments matching a Free5GC network function."""
+    deployments = find_network_function_deployments(deployment_name, network_function, namespace)
+    if not deployments:
+        message = (
+            f"No Kubernetes Deployment found for network function '{network_function}' "
+            f"under release '{deployment_name}' in namespace '{namespace}'"
+        )
+        logger.error(message)
+        return False, message, []
+
+    failures = []
+    for name in deployments:
+        success, message = scale_deployment(name, replicas, namespace)
+        if not success:
+            failures.append(message)
+
+    if failures:
+        return False, "; ".join(failures), deployments
+
+    message = f"Scaled {network_function} deployment(s) {deployments} to {replicas} replicas"
+    logger.info(message)
+    return True, message, deployments
+
+
 def restart_deployment(
     deployment_name: str,
     namespace: str = "free5gc"
@@ -357,6 +457,35 @@ def restart_deployment(
         message = f"Error restarting deployment: {str(e)}"
         logger.error(message)
         return False, message
+
+
+def restart_network_function(
+    deployment_name: str,
+    network_function: str,
+    namespace: str = "free5gc"
+) -> Tuple[bool, str, List[str]]:
+    """Restart all Kubernetes deployments matching a Free5GC network function."""
+    deployments = find_network_function_deployments(deployment_name, network_function, namespace)
+    if not deployments:
+        message = (
+            f"No Kubernetes Deployment found for network function '{network_function}' "
+            f"under release '{deployment_name}' in namespace '{namespace}'"
+        )
+        logger.error(message)
+        return False, message, []
+
+    failures = []
+    for name in deployments:
+        success, message = restart_deployment(name, namespace)
+        if not success:
+            failures.append(message)
+
+    if failures:
+        return False, "; ".join(failures), deployments
+
+    message = f"Restarted {network_function} deployment(s): {deployments}"
+    logger.info(message)
+    return True, message, deployments
 
 
 def wait_for_pods(

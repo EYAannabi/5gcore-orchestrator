@@ -1252,7 +1252,8 @@
                 const deployName = document.querySelector('#rollbackForm input[name="deployment_name"]').value;
                 const namespace = document.querySelector('#rollbackForm input[name="namespace"]').value;
                 
-                const revisions = await apiCall(`/core/revisions?deployment_name=${encodeURIComponent(deployName)}&namespace=${encodeURIComponent(namespace)}`);
+                const response = await apiCall(`/core/revisions?deployment_name=${encodeURIComponent(deployName)}&namespace=${encodeURIComponent(namespace)}`);
+                const revisions = response.revisions || [];
                 
                 document.getElementById('rollbackAvailable').style.display = 'block';
                 document.getElementById('revisionsList').innerHTML = revisions
@@ -1352,14 +1353,14 @@
                     document.getElementById('testResultsContent').innerHTML = `
                         <div style="padding: 16px;">
                             <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">
-                                ${status} ${response.test_name}
+                                ${status} ${response.test}
                             </div>
                             <div>Status: <strong>${response.status}</strong></div>
                             <div>Duration: ${response.duration_seconds}s</div>
                             <div style="margin-top: 8px; padding: 8px; background: rgba(30, 41, 59, 0.5); border-radius: 4px;">
                                 <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">${JSON.stringify(response.details, null, 2)}</pre>
                             </div>
-                            ${response.error_message ? `<div style="color: var(--danger); margin-top: 8px;">Error: ${response.error_message}</div>` : ''}
+                            ${response.error ? `<div style="color: var(--danger); margin-top: 8px;">Error: ${response.error}</div>` : ''}
                         </div>
                     `;
                 }
@@ -1374,7 +1375,8 @@
         
         async function loadOperationHistory() {
             try {
-                const ops = await apiCall('/history/operations?limit=20');
+                const historyResponse = await apiCall('/history/operations?limit=20');
+                const ops = historyResponse.operations || [];
                 
                 const tbody = document.getElementById('historyTable');
                 tbody.innerHTML = ops.length === 0 ? '<tr><td colspan="6">No operations recorded</td></tr>' :

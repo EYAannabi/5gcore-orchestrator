@@ -237,6 +237,39 @@ def build_helm_values(config) -> Dict[str, str]:
     return values
 
 
+def normalize_upgrade_values(values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Convert UI/API upgrade fields to Helm --set keys.
+
+    Existing Helm keys containing dots are preserved, so advanced callers can
+    still pass chart-native values directly.
+    """
+    if not values:
+        return {}
+
+    key_map = {
+        "mcc": "global.mcc",
+        "mnc": "global.mnc",
+        "slice_type": "slice.type",
+        "num_upf_replicas": "upf.replicas",
+        "num_smf_replicas": "smf.replicas",
+        "num_amf_replicas": "amf.replicas",
+        "expose_webui": "webui.enabled",
+        "enable_prometheus": "prometheus.enabled",
+        "monitoring_enabled": "monitoring.enabled",
+    }
+
+    normalized = {}
+    for key, value in values.items():
+        if value is None or value == "":
+            continue
+        helm_key = key if "." in key else key_map.get(key)
+        if helm_key:
+            normalized[helm_key] = value
+
+    return normalized
+
+
 def upgrade_release(
     deployment_name: str = "free5gc-helm",
     namespace: str = "free5gc",
@@ -261,6 +294,7 @@ def upgrade_release(
         
         cmd = ["helm", "upgrade", deployment_name, chart_path]
         cmd.extend(["--namespace", namespace])
+        cmd.append("--reuse-values")
         
         if values:
             for key, value in values.items():
