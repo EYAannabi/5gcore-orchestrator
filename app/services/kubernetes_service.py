@@ -12,16 +12,23 @@ from kubernetes.client.rest import ApiException
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Load Kubernetes configuration
+# Load Kubernetes configuration. The API must still start on machines that do
+# not have kubeconfig available; route handlers will report empty/error results.
+KUBE_CONFIGURED = False
 try:
     config.load_kube_config()
+    KUBE_CONFIGURED = True
     logger.info("Kubernetes configuration loaded successfully")
 except Exception as e:
-    logger.error(f"Failed to load Kubernetes configuration: {e}")
-    raise
+    try:
+        config.load_incluster_config()
+        KUBE_CONFIGURED = True
+        logger.info("In-cluster Kubernetes configuration loaded successfully")
+    except Exception:
+        logger.warning(f"Kubernetes configuration not available: {e}")
 
-v1 = client.CoreV1Api()
-apps_v1 = client.AppsV1Api()
+v1 = client.CoreV1Api() if KUBE_CONFIGURED else None
+apps_v1 = client.AppsV1Api() if KUBE_CONFIGURED else None
 
 
 def list_pods(namespace: str = "free5gc") -> List[Dict[str, Any]]:
@@ -35,6 +42,10 @@ def list_pods(namespace: str = "free5gc") -> List[Dict[str, Any]]:
         List of pod information dictionaries
     """
     try:
+        if not v1:
+            logger.warning("Kubernetes client is not configured; returning no pods")
+            return []
+
         pods = v1.list_namespaced_pod(namespace=namespace)
         result = []
         for pod in pods.items:
@@ -68,6 +79,10 @@ def get_node_status() -> List[Dict[str, Any]]:
         List of node information dictionaries
     """
     try:
+        if not v1:
+            logger.warning("Kubernetes client is not configured; returning no nodes")
+            return []
+
         nodes = v1.list_node()
         node_list = []
         
@@ -112,6 +127,11 @@ def delete_specific_pod(pod_name: str, namespace: str = "free5gc") -> Tuple[bool
         Tuple of (success: bool, message: str)
     """
     try:
+        if not v1:
+            message = "Kubernetes client is not configured"
+            logger.error(message)
+            return False, message
+
         v1.delete_namespaced_pod(
             name=pod_name,
             namespace=namespace,
@@ -152,6 +172,11 @@ def get_pod_logs(
         Pod logs as string
     """
     try:
+        if not v1:
+            message = "Kubernetes client is not configured"
+            logger.error(message)
+            return message
+
         logs = v1.read_namespaced_pod_log(
             name=pod_name,
             namespace=namespace,
@@ -267,6 +292,11 @@ def scale_deployment(
         Tuple of (success: bool, message: str)
     """
     try:
+        if not apps_v1:
+            message = "Kubernetes client is not configured"
+            logger.error(message)
+            return False, message
+
         deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
         deployment.spec.replicas = replicas
         apps_v1.patch_namespaced_deployment(deployment_name, namespace, deployment)
@@ -301,6 +331,11 @@ def restart_deployment(
         Tuple of (success: bool, message: str)
     """
     try:
+        if not apps_v1:
+            message = "Kubernetes client is not configured"
+            logger.error(message)
+            return False, message
+
         deployment = apps_v1.read_namespaced_deployment(deployment_name, namespace)
         
         # Trigger a rollout restart by updating pod spec annotation
@@ -357,116 +392,3 @@ def wait_for_pods(
             return False, running_count
         
         time.sleep(5)  # Check every 5 seconds
-
-
-def delete_specific_pod(pod_name: str, namespace: str = "free5gc") -> Tuple[bool, str]:
-    """
-    Delete a specific pod (triggers automatic restart via Kubernetes).
-    
-    Args:
-        pod_name: Name of the pod to delete
-        namespace: Kubernetes namespace
-        
-    Returns:
-        Tuple of (success: bool, message: str)
-    """
-    try:
-        v1.delete_namespaced_pod(
-            name=pod_name,
-            namespace=namespace,
-            grace_period_seconds=30
-        )
-        message = f"Pod '{pod_name}' deleted successfully. Kubernetes will recreate it."
-        logger.info(message)
-        return True, message
-    except ApiException as e:
-        if e.status == 404:
-            message = f"Pod '{pod_name}' not found in namespace '{namespace}'"
-        else:
-            message = f"Failed to delete pod: {e.reason}"
-        logger.error(message)
-        return False, message
-    except Exception as e:
-        message = f"Error deleting pod: {str(e)}"
-        logger.error(message)
-        return False, message
-
-
-def get_pod_logs(
-    pod_name: str,
-    namespace: str = "free5gc",
-    tail_lines: int = 100,
-    previous: bool = False
-) -> str:
-    """
-    Retrieve logs from a specific pod.
-    
-    Args:
-        pod_name: Name of the pod
-        namespace: Kubernetes namespace
-        tail_lines: Number of lines to retrieve
-        previous: Get logs from previous container instance
-        
-    Returns:
-        Pod logs as string
-    """
-    try:
-        logs = v1.read_namespaced_pod_log(
-            name=pod_name,
-            namespace=namespace,
-            tail_lines=tail_lines,
-            previous=previous
-        )
-        logger.info(f"Retrieved logs from pod '{pod_name}'")
-        return logs if logs else "No logs available"
-    except ApiException as e:
-        message = f"Failed to retrieve logs: {e.reason}"
-        logger.error(message)
-        return message
-    except Exception as e:
-        message = f"Error retrieving logs: {str(e)}"
-        logger.error(message)
-        return message
-
-
-def check_deployment_status(namespace: str = "free5gc") -> Dict[str, Any]:
-    """
-    Check overall deployment status in the namespace.
-    
-    Args:
-        namespace: Kubernetes namespace
-        
-    Returns:
-        Dictionary with deployment status information
-    """
-    try:
-        pods = list_pods(namespace)
-        
-        if not pods:
-            return {
-                "deployed": False,
-                "pods_total": 0,
-                "pods_running": 0,
-                "pods_failed": 0
-            }
-        
-        pods_running = sum(1 for pod in pods if pod["status"] == "Running")
-        pods_failed = sum(1 for pod in pods if pod["status"] != "Running")
-        
-        return {
-            "deployed": True,
-            "pods_total": len(pods),
-            "pods_running": pods_running,
-            "pods_failed": pods_failed,
-            "pod_list": pods,
-            "node_info": get_node_status()[0] if get_node_status() else None
-        }
-    except Exception as e:
-        logger.error(f"Error checking deployment status: {e}")
-        return {
-            "deployed": False,
-            "pods_total": 0,
-            "pods_running": 0,
-            "pods_failed": 0,
-            "error": str(e)
-        }

@@ -23,6 +23,7 @@ DB_PATH = DB_DIR / "orchestrator.db"
 
 def init_database():
     """Initialize SQLite database with required tables"""
+    conn = None
     DB_DIR.mkdir(exist_ok=True)
     
     try:
@@ -119,6 +120,13 @@ def init_database():
             conn.close()
 
 
+def _ensure_database() -> bool:
+    """Create the SQLite database lazily before the first history operation."""
+    if DB_PATH.exists():
+        return True
+    return init_database()
+
+
 def log_operation(operation: OperationHistory) -> Optional[int]:
     """
     Record a deployment operation in the database.
@@ -129,6 +137,10 @@ def log_operation(operation: OperationHistory) -> Optional[int]:
     Returns:
         Database ID of inserted record, or None on error
     """
+    if not _ensure_database():
+        return None
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -175,6 +187,10 @@ def log_validation_report(report: ValidationReport) -> Optional[int]:
     Returns:
         Database ID of inserted report, or None on error
     """
+    if not _ensure_database():
+        return None
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -197,7 +213,7 @@ def log_validation_report(report: ValidationReport) -> Optional[int]:
             report.tests_total,
             report.overall_status.value,
             report.summary,
-            json.dumps([t.dict() for t in report.tests])
+            json.dumps([t.model_dump(mode="json") for t in report.tests])
         ))
         
         report_id = cursor.lastrowid
@@ -224,6 +240,10 @@ def get_deployment_history(deployment_name: str, namespace: str = "free5gc", lim
     Returns:
         List of OperationHistory objects
     """
+    if not _ensure_database():
+        return []
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -267,6 +287,10 @@ def get_deployment_history(deployment_name: str, namespace: str = "free5gc", lim
 
 def get_all_operations(limit: int = 100) -> List[OperationHistory]:
     """Get all recorded operations across all deployments."""
+    if not _ensure_database():
+        return []
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -309,6 +333,10 @@ def get_all_operations(limit: int = 100) -> List[OperationHistory]:
 
 def get_latest_validation_report(deployment_name: str, namespace: str = "free5gc") -> Optional[ValidationReport]:
     """Get the most recent validation report for a deployment."""
+    if not _ensure_database():
+        return None
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -353,6 +381,10 @@ def get_latest_validation_report(deployment_name: str, namespace: str = "free5gc
 
 def get_validation_history(deployment_name: str, namespace: str = "free5gc", limit: int = 20) -> List[ValidationReport]:
     """Get validation history for a deployment."""
+    if not _ensure_database():
+        return []
+
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -397,6 +429,3 @@ def get_validation_history(deployment_name: str, namespace: str = "free5gc", lim
             conn.close()
 
 
-# Initialize database on module load
-if not DB_PATH.exists():
-    init_database()

@@ -228,9 +228,9 @@ async def rollback_deployment(request: RollbackRequest):
         start_time = time.time()
         
         # Get current revision before rollback
-        history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
+        history_success, history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
         current_revision = None
-        if history and len(history) > 0:
+        if history_success and history:
             current_revision = history[0].get("revision")
         
         # Perform rollback
@@ -243,9 +243,9 @@ async def rollback_deployment(request: RollbackRequest):
         duration = time.time() - start_time
         
         # Get new revision after rollback
-        new_history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
+        new_history_success, new_history, _ = helm_service.get_release_history(request.deployment_name, request.namespace)
         new_revision = None
-        if new_history and len(new_history) > 0:
+        if new_history_success and new_history:
             new_revision = new_history[0].get("revision")
         
         # Record operation

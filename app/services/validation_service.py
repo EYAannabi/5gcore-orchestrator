@@ -442,17 +442,17 @@ async def run_all_validations(
         # Build summary
         summary_parts = [
             f"Validation report for {deployment_name}:",
-            f"✓ Passed: {passed}",
-            f"✗ Failed: {failed}",
-            f"⊘ Skipped: {skipped}",
-            f"⚠ Errors: {errors}"
+            f"Passed: {passed}",
+            f"Failed: {failed}",
+            f"Skipped: {skipped}",
+            f"Errors: {errors}"
         ]
-        
+
         if overall == TestStatus.PASSED:
-            summary_parts.insert(0, "✓ ALL TESTS PASSED")
+            summary_parts.insert(0, "ALL TESTS PASSED")
         else:
-            summary_parts.insert(0, "✗ SOME TESTS FAILED")
-        
+            summary_parts.insert(0, "SOME TESTS FAILED")
+
         summary = " | ".join(summary_parts)
         
         duration = (datetime.utcnow() - start_time).total_seconds()

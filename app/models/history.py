@@ -166,10 +166,10 @@ class DeploymentRevision(BaseModel):
     """Helm release revision information"""
     
     revision: int = Field(..., description="Revision number")
-    app_version: str = Field(..., description="Free5GC version")
-    status: str = Field(..., description="Release status (deployed, superseded, etc)")
+    app_version: Optional[str] = Field(None, description="Free5GC version")
+    status: Optional[str] = Field(None, description="Release status (deployed, superseded, etc)")
     updated: datetime = Field(..., description="When this revision was deployed")
-    description: str = Field(..., description="Release description")
+    description: Optional[str] = Field(None, description="Release description")
     deployment_name: str = Field(..., description="Release name")
     
     class Config:

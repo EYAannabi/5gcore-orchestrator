@@ -943,7 +943,10 @@
             try {
                 const options = { method, headers: { 'Content-Type': 'application/json' } };
                 if (data) options.body = JSON.stringify(data);
-                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const normalizedEndpoint = endpoint.startsWith('/api/')
+                    ? endpoint.substring(API_BASE.length)
+                    : endpoint;
+                const response = await fetch(`${API_BASE}${normalizedEndpoint}`, options);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return await response.json();
             } catch (error) {
@@ -1169,7 +1172,7 @@
 
             try {
                 document.getElementById('upgradeProgress').style.display = 'block';
-                const response = await apiCall('/api/core/upgrade?deployment_name=' + payload.deployment_name + '&namespace=' + payload.namespace, 'POST', payload);
+                const response = await apiCall('/core/upgrade?deployment_name=' + encodeURIComponent(payload.deployment_name) + '&namespace=' + encodeURIComponent(payload.namespace), 'POST', values);
                 
                 document.querySelector('#upgradeProgress .progress-fill').style.width = '100%';
                 document.getElementById('upgradeProgressText').textContent = 'Upgrade in progress: Rolling out new configuration...';
@@ -1198,7 +1201,7 @@
 
             try {
                 document.getElementById('scaleProgress').style.display = 'block';
-                const response = await apiCall('/api/core/scale', 'POST', payload);
+                const response = await apiCall('/core/scale', 'POST', payload);
                 
                 document.querySelector('#scaleProgress .progress-fill').style.width = '100%';
                 document.getElementById('scaleProgressText').textContent = `✅ Scaling ${payload.network_function} to ${payload.replicas} replicas (zero-downtime)...`;
@@ -1227,7 +1230,7 @@
             try {
                 showConfirmModal(`Restart ${payload.network_function}? This will restart pods gracefully.`, 'Confirm Restart', async () => {
                     document.getElementById('restartProgress').style.display = 'block';
-                    const response = await apiCall('/api/core/restart', 'POST', payload);
+                    const response = await apiCall('/core/restart', 'POST', payload);
                     
                     document.querySelector('#restartProgress .progress-fill').style.width = '100%';
                     document.getElementById('restartProgressText').textContent = `✅ Restarting ${payload.network_function} (pods rolling restart)...`;
@@ -1249,7 +1252,7 @@
                 const deployName = document.querySelector('#rollbackForm input[name="deployment_name"]').value;
                 const namespace = document.querySelector('#rollbackForm input[name="namespace"]').value;
                 
-                const revisions = await apiCall(`/api/core/revisions?deployment_name=${deployName}&namespace=${namespace}`);
+                const revisions = await apiCall(`/core/revisions?deployment_name=${encodeURIComponent(deployName)}&namespace=${encodeURIComponent(namespace)}`);
                 
                 document.getElementById('rollbackAvailable').style.display = 'block';
                 document.getElementById('revisionsList').innerHTML = revisions
@@ -1279,7 +1282,7 @@
             try {
                 showConfirmModal(`Rollback deployment? This will restore to a previous version with zero-downtime.`, 'Confirm Rollback', async () => {
                     document.getElementById('rollbackProgress').style.display = 'block';
-                    const response = await apiCall('/api/core/rollback', 'POST', payload);
+                    const response = await apiCall('/core/rollback', 'POST', payload);
                     
                     document.querySelector('#rollbackProgress .progress-fill').style.width = '100%';
                     document.getElementById('rollbackProgressText').textContent = `✅ Rollback in progress: Restoring previous version...`;
@@ -1310,20 +1313,17 @@
             try {
                 let endpoint = '';
                 switch(testType) {
-                    case 'pods': endpoint = '/api/tests/validate-pods'; break;
-                    case 'amf': endpoint = '/api/tests/validate-amf'; break;
-                    case 'ue': endpoint = '/api/tests/validate-ue'; break;
-                    case 'pdu': endpoint = '/api/tests/validate-pdu'; break;
-                    case 'connectivity': endpoint = '/api/tests/validate-connectivity'; break;
-                    case 'all': endpoint = '/api/tests/validate-all'; break;
+                    case 'pods': endpoint = '/tests/validate-pods'; break;
+                    case 'amf': endpoint = '/tests/validate-amf'; break;
+                    case 'ue': endpoint = '/tests/validate-ue'; break;
+                    case 'pdu': endpoint = '/tests/validate-pdu'; break;
+                    case 'connectivity': endpoint = '/tests/validate-connectivity'; break;
+                    case 'all': endpoint = '/tests/validate-all'; break;
                 }
 
                 showNotification(testType === 'all' ? '🚀 Running all tests...' : `⏳ Running ${testType} test...`, 'success');
                 
-                const response = await apiCall(endpoint, 'POST', {
-                    namespace: namespace,
-                    deployment_name: deployName
-                });
+                const response = await apiCall(`${endpoint}?deployment_name=${encodeURIComponent(deployName)}&namespace=${encodeURIComponent(namespace)}`, 'POST');
 
                 document.getElementById('testResults').style.display = 'block';
                 
@@ -1374,7 +1374,7 @@
         
         async function loadOperationHistory() {
             try {
-                const ops = await apiCall('/api/history/operations?limit=20');
+                const ops = await apiCall('/history/operations?limit=20');
                 
                 const tbody = document.getElementById('historyTable');
                 tbody.innerHTML = ops.length === 0 ? '<tr><td colspan="6">No operations recorded</td></tr>' :
@@ -1395,7 +1395,7 @@
                     `).join('');
                     
                 // Load stats
-                const stats = await apiCall('/api/history/stats');
+                const stats = await apiCall('/history/stats');
                 document.getElementById('statsContent').innerHTML = `
                     <div class="stat-card">
                         <div class="stat-value">${stats.total_operations}</div>
