@@ -318,91 +318,47 @@ async def validate_connectivity(
     deployment_name: str = "free5gc-helm",
     test_host: str = "8.8.8.8"
 ) -> ValidationTestResult:
-    """
-    Validate internet connectivity through UERANSIM's uesimtun0 interface.
-    
-    Args:
-        namespace: Kubernetes namespace
-        deployment_name: Deployment name
-        test_host: Host to ping (default: Google DNS 8.8.8.8)
-        
-    Returns:
-        ValidationTestResult with connectivity status
-    """
     start_time = datetime.utcnow()
-    
     try:
         pods = list_pods(namespace=namespace)
-        ueransim_pods = [p for p in pods if "ueransim" in p["name"].lower()]
-        
-        if not ueransim_pods:
+        ueransim_pods = [p for p in pods if "ueransim-ue" in p["name"].lower()]
+
+        if not ueransim_pods or not any(p["status"] == "Running" for p in ueransim_pods):
             return ValidationTestResult(
                 test_name="Connectivity Check",
                 test_type=ValidationTestType.CONNECTIVITY,
                 status=TestStatus.SKIPPED,
-                details={"reason": "UERANSIM pod not found"},
-                error_message="Cannot test connectivity without UERANSIM"
+                error_message="UERANSIM UE pod not running",
             )
-        
-        if not any(p["status"] == "Running" for p in ueransim_pods):
-            return ValidationTestResult(
-                test_name="Connectivity Check",
-                test_type=ValidationTestType.CONNECTIVITY,
-                status=TestStatus.FAILED,
-                details={"reason": "UERANSIM pod not running"},
-                error_message="UERANSIM pod is not running"
-            )
-        
-        # In a real scenario:
-        # 1. exec into UERANSIM pod
-        # 2. Run: ip link show uesimtun0 (check if interface exists)
-        # 3. Run: ip addr show uesimtun0 (check if has IP)
-        # 4. Run: ping -c 4 {test_host} (test connectivity)
-        
-        # For now, simulate by checking if we can query the pod
-        ueransim_pod = ueransim_pods[0]
-        
-        try:
-            # Try to exec into pod and check interface
-            cmd = [
-                "kubectl", "exec", ueransim_pod["name"],
-                "-n", namespace,
-                "--", "ip", "link", "show", "uesimtun0"
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            interface_exists = result.returncode == 0
-        except:
-            interface_exists = False
-        
+
+        ue_pod = ueransim_pods[0]
+        cmd = [
+            "kubectl", "exec", ue_pod["name"], "-n", namespace,
+            "--", "ping", "-I", "uesimtun0", "-c", "3", "-W", "3", test_host,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        ping_success = result.returncode == 0 and "0% packet loss" in result.stdout
+
         duration = (datetime.utcnow() - start_time).total_seconds()
-        
-        status = TestStatus.PASSED if interface_exists else TestStatus.FAILED
-        
+        status = TestStatus.PASSED if ping_success else TestStatus.FAILED
+
         return ValidationTestResult(
             test_name="Connectivity Check",
             test_type=ValidationTestType.CONNECTIVITY,
             status=status,
             duration_seconds=duration,
-            details={
-                "ueransim_pod": ueransim_pod["name"],
-                "uesimtun0_exists": interface_exists,
-                "test_host": test_host
-            },
-            checked_pods=[ueransim_pod["name"]],
-            error_message=None if status == TestStatus.PASSED else "uesimtun0 interface not accessible"
+            details={"ping_output": result.stdout[-300:], "test_host": test_host},
+            checked_pods=[ue_pod["name"]],
+            error_message=None if ping_success else "Ping failed or interface unreachable",
         )
     except Exception as e:
-        logger.error(f"Error validating connectivity: {e}")
-        duration = (datetime.utcnow() - start_time).total_seconds()
         return ValidationTestResult(
             test_name="Connectivity Check",
             test_type=ValidationTestType.CONNECTIVITY,
             status=TestStatus.ERROR,
-            duration_seconds=duration,
-            error_message=str(e)
+            error_message=str(e),
         )
-
-
+    
 async def run_all_validations(
     namespace: str = "free5gc",
     deployment_name: str = "free5gc-helm"
