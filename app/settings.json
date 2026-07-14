@@ -1,0 +1,7 @@
+{
+  "default_namespace": "free5gc",
+  "default_helm_chart_path": "~/free5gc-helm/charts/free5gc",
+  "refresh_interval": 5,
+  "dark_mode": true,
+  "auto_deploy_monitoring": true
+}
