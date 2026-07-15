@@ -173,48 +173,33 @@ async def validate_ue_registration(
 ) -> ValidationTestResult:
     """
     Validate that UE is registered via UERANSIM.
-    Attempts to query UERANSIM pods for registered UE status.
-    
-    Args:
-        namespace: Kubernetes namespace
-        deployment_name: Deployment name
-        
-    Returns:
-        ValidationTestResult with UE registration status
     """
     start_time = datetime.utcnow()
-    
+
     try:
         pods = list_pods(namespace=namespace)
-        ueransim_pods = [p for p in pods if "ueransim" in p["name"].lower()]
-        
+        ueransim_pods = [p for p in pods if "ueransim-ue" in p["name"].lower()]
+
         if not ueransim_pods:
             return ValidationTestResult(
                 test_name="UE Registration Check",
                 test_type=ValidationTestType.UE_REGISTRATION,
                 status=TestStatus.SKIPPED,
-                details={"reason": "UERANSIM pod not found"},
+                details={"reason": "UERANSIM UE pod not found"},
                 error_message="UERANSIM pod not deployed"
             )
-        
-        # In a real scenario:
-        # 1. exec into UERANSIM pod and run nr-cli to check UE status
-        # 2. Query UE registration via gNB or RAN interface
-        # 3. Check UERANSIM logs for "Registration complete" messages
-        
+
         ueransim_running = all(p["status"] == "Running" for p in ueransim_pods)
-        
-        # Check logs for registration indicators
+
         logs_sample = ""
         if ueransim_running and ueransim_pods:
-            logs_sample = get_pod_logs(ueransim_pods[0]["name"], namespace, tail_lines=100)
-        
-        registered = "registration" in logs_sample.lower() or "registered" in logs_sample.lower()
-        
+            logs_sample = get_pod_logs(ueransim_pods[0]["name"], namespace, tail_lines=300)
+
+        registered = "Initial Registration is successful" in logs_sample
+
         duration = (datetime.utcnow() - start_time).total_seconds()
-        
         status = TestStatus.PASSED if registered else TestStatus.FAILED
-        
+
         return ValidationTestResult(
             test_name="UE Registration Check",
             test_type=ValidationTestType.UE_REGISTRATION,
@@ -225,7 +210,7 @@ async def validate_ue_registration(
                 "registration_detected": registered
             },
             checked_pods=[p["name"] for p in ueransim_pods],
-            error_message=None if status == TestStatus.PASSED else "UE registration not detected"
+            error_message=None if status == TestStatus.PASSED else "UE registration not detected in recent logs"
         )
     except Exception as e:
         logger.error(f"Error validating UE registration: {e}")
@@ -237,68 +222,53 @@ async def validate_ue_registration(
             duration_seconds=duration,
             error_message=str(e)
         )
-
-
+    
 async def validate_pdu_session(
     namespace: str = "free5gc",
     deployment_name: str = "free5gc-helm"
 ) -> ValidationTestResult:
     """
-    Validate that PDU Session has been established.
-    Queries SMF for established sessions.
-    
-    Args:
-        namespace: Kubernetes namespace
-        deployment_name: Deployment name
-        
-    Returns:
-        ValidationTestResult with PDU session status
+    Validate that PDU Session has been established, by checking UERANSIM UE logs
+    (the UE is the one reporting successful session establishment).
     """
     start_time = datetime.utcnow()
-    
+
     try:
         pods = list_pods(namespace=namespace)
-        smf_pods = [p for p in pods if "smf" in p["name"].lower()]
+        ue_pods = [p for p in pods if "ueransim-ue" in p["name"].lower()]
         upf_pods = [p for p in pods if "upf" in p["name"].lower()]
-        
-        if not smf_pods or not upf_pods:
+
+        if not ue_pods or not upf_pods:
             return ValidationTestResult(
                 test_name="PDU Session Check",
                 test_type=ValidationTestType.PDU_SESSION,
                 status=TestStatus.SKIPPED,
-                details={"reason": "SMF or UPF pods not found"},
+                details={"reason": "UE or UPF pods not found"},
                 error_message="Required pods not deployed"
             )
-        
-        # In a real scenario:
-        # 1. Query SMF REST API for active sessions
-        # 2. Check UPF data plane status
-        # 3. Verify PFCP association between SMF and UPF
-        
-        smf_running = all(p["status"] == "Running" for p in smf_pods)
+
+        ue_running = all(p["status"] == "Running" for p in ue_pods)
         upf_running = all(p["status"] == "Running" for p in upf_pods)
-        
-        # Check SMF logs for session establishment
+
         session_established = False
-        if smf_running and smf_pods:
-            logs = get_pod_logs(smf_pods[0]["name"], namespace, tail_lines=100)
-            session_established = "session" in logs.lower() and "established" in logs.lower()
-        
+        if ue_running and ue_pods:
+            logs = get_pod_logs(ue_pods[0]["name"], namespace, tail_lines=300)
+            session_established = "PDU Session establishment is successful" in logs
+
         duration = (datetime.utcnow() - start_time).total_seconds()
-        
-        status = TestStatus.PASSED if (smf_running and upf_running and session_established) else TestStatus.FAILED
-        
+        status = TestStatus.PASSED if (ue_running and upf_running and session_established) else TestStatus.FAILED
+
         return ValidationTestResult(
             test_name="PDU Session Check",
             test_type=ValidationTestType.PDU_SESSION,
             status=status,
             duration_seconds=duration,
             details={
-                "smf_running": smf_running,
+                "ue_running": ue_running,
                 "upf_running": upf_running,
                 "session_established": session_established
             },
-            checked_pods=[p["name"] for p in smf_pods] + [p["name"] for p in upf_pods],
+            checked_pods=[p["name"] for p in ue_pods] + [p["name"] for p in upf_pods],
             error_message=None if status == TestStatus.PASSED else "PDU session not established"
         )
     except Exception as e:
@@ -311,8 +281,7 @@ async def validate_pdu_session(
             duration_seconds=duration,
             error_message=str(e)
         )
-
-
+    
 async def validate_connectivity(
     namespace: str = "free5gc",
     deployment_name: str = "free5gc-helm",
