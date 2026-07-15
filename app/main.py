@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.routes import pods, deploy, logs, settings, lifecycle, validations, history, operator
+from app.routes import pods, deploy, logs, settings, lifecycle, validations, history, operator, auth
 
 # Configure logging
 logging.basicConfig(
@@ -46,15 +46,16 @@ app.include_router(lifecycle.router, prefix="/api")
 app.include_router(validations.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 app.include_router(operator.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 # Mount static files for frontend
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Root endpoint - serve frontend
 @app.get("/", tags=["System"])
 async def root():
-    """Serve the main operator interface"""
-    return FileResponse("app/static/index.html")
-
+    """Serve the login interface as the entry point"""
+    # On change index.html par login.html
+    return FileResponse("app/static/login.html")
 
 @app.get("/health", tags=["System"])
 async def health():
@@ -64,7 +65,10 @@ async def health():
         "service": "5G Core Orchestrator",
         "version": "2.0.0"
     }
-
+@app.get("/debug", tags=["System"])
+async def debug_dashboard():
+    """Access the original dashboard for testing"""
+    return FileResponse("app/static/index.html")
 
 # Startup event
 @app.on_event("startup")

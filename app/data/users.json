@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "username": "orange",
+      "password": "orange123",
+      "role": "operator",
+      "namespace": "orange-5g"
+    },
+    {
+      "username": "ooredoo",
+      "password": "ooredoo123",
+      "role": "operator",
+      "namespace": "ooredoo-5g"
+    },
+    {
+      "username": "huawei",
+      "password": "admin123",
+      "role": "admin",
+      "namespace": "all"
+    }
+  ]
+}
