@@ -1,40 +1,43 @@
 """
 Deployment orchestration routes.
-Handles Free5GC deployment lifecycle management.
+Handles Free5GC deployment lifecycle management with Multi-Operator isolation.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.services.helm_service import deploy_free5gc, clean_free5gc, build_helm_values, get_deployment_status
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from app.services.helm_service import (
+    deploy_free5gc, 
+    clean_free5gc, 
+    build_helm_values, 
+    get_deployment_status
+)
 from app.services.kubernetes_service import check_deployment_status
 from app.models.deployment import DeploymentConfig, DeploymentResponse, DeploymentStatus
 
 logger = logging.getLogger(__name__)
 
+# On garde le préfixe /core pour la cohérence avec ton frontend
 router = APIRouter(prefix="/core", tags=["Orchestration"])
 
-
 @router.post("/deploy", response_model=DeploymentResponse)
-async def deploy(config: DeploymentConfig, background_tasks: BackgroundTasks):
+async def deploy(config: DeploymentConfig):
     """
-    Deploy Free5GC with the provided configuration.
-    
-    Accepts deployment parameters and initiates Helm installation.
-    Parameters are validated by Pydantic before processing.
-    
-    Args:
-        config: DeploymentConfig with all deployment parameters
-        
-    Returns:
-        DeploymentResponse with status and deployment information
+    Déploie un cœur 5G pour un opérateur spécifique.
+    Le namespace est envoyé par le frontend (basé sur le login de l'utilisateur).
     """
     try:
-        logger.info(f"Starting deployment: {config.deployment_name} in namespace {config.namespace}")
-        
-        # Convert configuration to Helm values
+        # On logue l'intention de déploiement
+        logger.info(f"--- Nouveau Déploiement ---")
+        logger.info(f"Opérateur: {config.operator_name}")
+        logger.info(f"Nom Release: {config.deployment_name}")
+        logger.info(f"Namespace Cible: {config.namespace}")
+
+        # Conversion de la config en valeurs Helm
         helm_values = build_helm_values(config)
         
-        # Execute Helm deployment
+        # Exécution du déploiement via Helm
+        # create_namespace=True garantit que si c'est le premier déploiement d'Orange, 
+        # le namespace orange-5g sera créé automatiquement.
         success, stdout, stderr = deploy_free5gc(
             deployment_name=config.deployment_name,
             namespace=config.namespace,
@@ -44,45 +47,39 @@ async def deploy(config: DeploymentConfig, background_tasks: BackgroundTasks):
         )
         
         if success:
-            logger.info(f"Deployment {config.deployment_name} initiated successfully")
+            logger.info(f"✅ Déploiement {config.deployment_name} réussi dans {config.namespace}")
             return DeploymentResponse(
                 status="Success",
-                message=f"Deployment '{config.deployment_name}' initiated successfully",
+                message=f"Le réseau 5G '{config.deployment_name}' a été déployé avec succès.",
                 deployment_name=config.deployment_name,
                 namespace=config.namespace,
                 output=stdout
             )
         else:
-            logger.error(f"Deployment failed: {stderr}")
+            logger.error(f"❌ Échec Helm: {stderr}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Deployment failed: {stderr}"
+                detail=f"Erreur lors de l'installation Helm: {stderr}"
             )
     
     except Exception as e:
-        logger.error(f"Error in deployment: {str(e)}")
+        logger.error(f"💥 Erreur système: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Deployment error: {str(e)}"
+            detail=f"Erreur interne du serveur: {str(e)}"
         )
 
-
 @router.delete("/clean", response_model=DeploymentResponse)
-async def clean(deployment_name: str = "free5gc-helm", namespace: str = "free5gc"):
+async def clean(
+    deployment_name: str = Query(..., description="Le nom de la release à supprimer"), 
+    namespace: str = Query(..., description="Le namespace de l'opérateur")
+):
     """
-    Clean up and remove Free5GC deployment.
-    
-    Uninstalls the Helm release and removes associated resources.
-    
-    Args:
-        deployment_name: Helm release name to remove
-        namespace: Kubernetes namespace
-        
-    Returns:
-        DeploymentResponse with cleanup status
+    Supprime un déploiement spécifique. 
+    Les paramètres sont obligatoires (Query(...,)) pour éviter les erreurs.
     """
     try:
-        logger.info(f"Starting cleanup for deployment: {deployment_name} in namespace {namespace}")
+        logger.info(f"Suppression du réseau {deployment_name} dans {namespace}")
         
         success, stdout, stderr = clean_free5gc(
             deployment_name=deployment_name,
@@ -90,55 +87,32 @@ async def clean(deployment_name: str = "free5gc-helm", namespace: str = "free5gc
         )
         
         if success:
-            logger.info(f"Deployment {deployment_name} cleaned up successfully")
             return DeploymentResponse(
                 status="Success",
-                message=f"Deployment '{deployment_name}' removed successfully",
+                message=f"Réseau '{deployment_name}' supprimé de l'espace {namespace}",
                 output=stdout
             )
         else:
-            logger.error(f"Cleanup failed: {stderr}")
-            # Don't fail if deployment doesn't exist
+            # Si le déploiement n'existe déjà plus, on ne renvoie pas d'erreur
             if "not found" in stderr.lower():
                 return DeploymentResponse(
                     status="Success",
-                    message="Deployment not found or already removed"
+                    message="Réseau déjà supprimé ou introuvable."
                 )
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cleanup failed: {stderr}"
-            )
+            raise HTTPException(status_code=400, detail=stderr)
     
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error in cleanup: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Cleanup error: {str(e)}"
-        )
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status", response_model=DeploymentStatus)
-async def get_status(namespace: str = "free5gc"):
+async def get_status(namespace: str = Query(..., description="Namespace à surveiller")):
     """
-    Get the current status of Free5GC deployment.
-    
-    Returns comprehensive deployment status including pod information
-    and cluster health.
-    
-    Args:
-        namespace: Kubernetes namespace to check
-        
-    Returns:
-        DeploymentStatus with detailed deployment information
+    Récupère le statut des microservices d'un opérateur.
     """
     try:
+        # On vérifie uniquement le namespace de l'opérateur connecté
         status = check_deployment_status(namespace=namespace)
         return DeploymentStatus(**status)
     except Exception as e:
-        logger.error(f"Error getting deployment status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving deployment status: {str(e)}"
-        )
+        logger.error(f"Erreur status namespace {namespace}: {e}")
+        raise HTTPException(status_code=500, detail="Impossible de récupérer l'état des Pods")

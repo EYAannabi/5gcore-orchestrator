@@ -53,19 +53,68 @@
     </div>
 
     <script>
-        const user = localStorage.getItem('user_role');
-        const ns = localStorage.getItem('namespace');
-        document.getElementById('operator-name').innerText = user;
-        document.getElementById('ns-display').innerText = ns;
+    // 1. Récupération des infos de session
+    const user = localStorage.getItem('username');
+    const role = localStorage.getItem('user_role');
+    const ns = localStorage.getItem('namespace');
 
-        function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+    if (!user || role !== 'operator') { window.location.href = 'login.html'; }
 
-        async function handleDeploy() {
-            const site = document.getElementById('site-name').value;
-            alert(`Déploiement lancé pour ${user} dans le namespace ${ns}`);
-            // Ici ton appel fetch('/api/core/deploy') avec le namespace
-        }
-        // Ajouter ici une fonction setInterval pour récupérer les pods via /api/status/pods?namespace=...
-    </script>
+    document.getElementById('operator-name').innerText = user;
+    document.getElementById('ns-display').innerText = ns;
+
+    // 2. Fonction de Déploiement
+    async function handleDeploy() {
+        const site = document.getElementById('site-name').value || "site-default";
+        const subs = document.getElementById('subscribers').value;
+        const btn = document.querySelector('button');
+        
+        btn.disabled = true;
+        btn.innerText = "Déploiement en cours...";
+
+        const payload = {
+            deployment_name: `${user}-core`, // ex: orange-core
+            namespace: ns,                   // ex: orange-5g
+            num_subscribers: parseInt(subs),
+            operator_name: user              // Ajout pour le backend
+        };
+
+        try {
+            const res = await fetch('/api/core/deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                alert("✅ Déploiement lancé avec succès !");
+            } else {
+                alert("❌ Erreur lors du déploiement");
+            }
+        } catch (e) { console.error(e); }
+        finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
+    }
+
+    // 3. Boucle de rafraîchissement des Pods
+    async function refreshPods() {
+        try {
+            const res = await fetch(`/api/status/pods?namespace=${ns}`);
+            const data = await res.json();
+            const tbody = document.getElementById('pods-table');
+            
+            tbody.innerHTML = data.pods.map(pod => `
+                <tr>
+                    <td><strong>${pod.name}</strong></td>
+                    <td><span class="badge ${pod.status === 'Running' ? 'bg-success' : 'bg-warning'}">${pod.status}</span></td>
+                    <td><code>${pod.ip || 'N/A'}</code></td>
+                </tr>
+            `).join('');
+        } catch (e) { console.error("Erreur pods:", e); }
+    }
+
+    setInterval(refreshPods, 3000); // Mise à jour toutes les 3 secondes
+    refreshPods();
+
+    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+</script>
 </body>
 </html>
