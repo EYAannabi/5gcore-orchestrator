@@ -6,7 +6,7 @@ Provides type validation and automatic OpenAPI documentation.
 # app/models/deployment.py
 from pydantic import BaseModel, Field
 from typing import Optional
-
+from enum import Enum 
 class DeploymentConfig(BaseModel):
     deployment_name: str
     namespace: str
@@ -17,7 +17,9 @@ class DeploymentConfig(BaseModel):
     num_amf_replicas: int = 1
     helm_chart_path: Optional[str] = None
     # ... garde les autres champs existants
-
+class DeploymentMode(str, Enum):
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
 class SliceType(str, Enum):
     """Network slice types for 5G"""
     EMBB = "eMBB"  # Enhanced Mobile Broadband
