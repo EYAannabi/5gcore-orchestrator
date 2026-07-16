@@ -190,24 +190,25 @@ def get_helm_values(
 def build_helm_values(config) -> Dict[str, str]:
     """
     Convertit la configuration métier en valeurs techniques Helm.
-    C'est ici que réside l'intelligence de dimensionnement (Smart Sizing).
+    Cette version résout les conflits de PersistentVolumes pour le multi-opérateur.
     """
     
-    # --- LOGIQUE DE DIMENSIONNEMENT AUTOMATIQUE ---
-    # Si l'opérateur demande beaucoup d'abonnés, on force la haute disponibilité
-    # même s'il a oublié de le préciser dans le formulaire.
-    
+    # --- LOGIQUE DE DIMENSIONNEMENT AUTOMATIQUE (SMART SIZING) ---
+    # Si l'opérateur demande plus de 5000 abonnés, on augmente les ressources
     calculated_upf = config.num_upf_replicas
     calculated_amf = config.num_amf_replicas
     
     if config.num_subscribers > 5000:
-        logger.info(f"Dimensionnement auto : Augmentation des réplicas pour {config.num_subscribers} abonnés")
+        logger.info(f"Dimensionnement auto : Haute disponibilité activée pour {config.num_subscribers} abonnés")
         calculated_upf = max(calculated_upf, 2)
         calculated_amf = max(calculated_amf, 2)
 
+    # Nettoyage du nom de l'opérateur pour les ressources K8s
+    op_id = config.operator_name.lower().replace(' ', '-')
+
     values = {
-        # Identification du propriétaire (Utile pour Huawei Admin)
-        "global.operatorName": config.operator_name,
+        # Identification du propriétaire
+        "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
         
         # Configuration réseau PLMN
@@ -217,65 +218,38 @@ def build_helm_values(config) -> Dict[str, str]:
         # Slicing
         "slice.type": config.slice_type.value,
         
-        # Nombre de réplicas calculé intelligemment
+        # Nombre de réplicas calculé
         "upf.replicas": str(calculated_upf),
         "smf.replicas": str(config.num_smf_replicas),
         "amf.replicas": str(calculated_amf),
         
-        # Paramètres d'exposition
+        # --- SOLUTION MULTI-OPÉRATEUR (ISOLATION DES VOLUMES) ---
+        # On rend les noms des PersistentVolumeClaims uniques par opérateur
+        "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
+        "mongodb.persistence.storageClass": "local-path", # Utilise le stockage dynamique de K3s
+        "mongodb.persistence.size": "8Gi",
+        
+        # Paramètres d'exposition et monitoring
         "webui.enabled": "true" if config.expose_webui else "false",
         "prometheus.enabled": "true" if config.enable_prometheus else "false",
         "monitoring.enabled": "true" if config.monitoring_enabled else "false",
+        
+        # Stratégie de mise à jour sans coupure (NetDevOps)
+        "global.deploymentStrategy": "RollingUpdate",
     }
     
-    # --- STRATÉGIE DE DÉPLOIEMENT (Zero Downtime) ---
-    # On s'assure que Kubernetes utilise le RollingUpdate
-    values["global.deploymentStrategy"] = "RollingUpdate"
-    
-    # Gestion des ressources CPU/RAM selon le mode
+    # Gestion des ressources CPU/RAM selon le mode choisi
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
+        values["affinity.enabled"] = "true"
     else:
         values["resources.requests.cpu"] = "100m"
         values["resources.requests.memory"] = "128Mi"
+        values["affinity.enabled"] = "false"
     
-    logger.info(f"Valeurs Helm générées pour {config.operator_name} ({config.deployment_name})")
+    logger.info(f"✅ Valeurs Helm générées avec isolation pour : {op_id}")
     return values
-
-def normalize_upgrade_values(values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Convert UI/API upgrade fields to Helm --set keys.
-
-    Existing Helm keys containing dots are preserved, so advanced callers can
-    still pass chart-native values directly.
-    """
-    if not values:
-        return {}
-
-    key_map = {
-        "mcc": "global.mcc",
-        "mnc": "global.mnc",
-        "slice_type": "slice.type",
-        "num_upf_replicas": "upf.replicas",
-        "num_smf_replicas": "smf.replicas",
-        "num_amf_replicas": "amf.replicas",
-        "expose_webui": "webui.enabled",
-        "enable_prometheus": "prometheus.enabled",
-        "monitoring_enabled": "monitoring.enabled",
-    }
-
-    normalized = {}
-    for key, value in values.items():
-        if value is None or value == "":
-            continue
-        helm_key = key if "." in key else key_map.get(key)
-        if helm_key:
-            normalized[helm_key] = value
-
-    return normalized
-
-
 def upgrade_release(
     deployment_name: str = "free5gc-helm",
     namespace: str = "free5gc",
