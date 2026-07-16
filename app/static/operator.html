@@ -77,34 +77,54 @@
 
     // 2. Fonction de Déploiement
     async function handleDeploy() {
-        const site = document.getElementById('site-name').value || "site-default";
-        const subs = document.getElementById('subscribers').value;
-        const btn = document.querySelector('button');
+    const site = document.getElementById('site-name').value || "site-default";
+    const subs = document.getElementById('subscribers').value;
+    const btn = document.querySelector('button');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement...';
+
+    // On prépare un objet complet qui correspond au modèle DeploymentConfig (Python)
+    const payload = {
+        deployment_name: `${user}-core`.toLowerCase().replace(/\s+/g, '-'), 
+        namespace: ns,                   
+        operator_name: user,
+        num_subscribers: parseInt(subs),
+        // On ajoute les valeurs par défaut pour éviter l'erreur 422
+        mcc: "208",
+        mnc: "93",
+        num_upf_replicas: 1,
+        num_smf_replicas: 1,
+        num_amf_replicas: 1,
+        slice_type: "eMBB",
+        deployment_mode: "development",
+        monitoring_enabled: true,
+        expose_webui: true,
+        enable_prometheus: true
+    };
+
+    try {
+        const res = await fetch('/api/core/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
         
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement...';
-
-        const payload = {
-            deployment_name: `${user}-core`, 
-            namespace: ns,                   
-            num_subscribers: parseInt(subs),
-            operator_name: user              
-        };
-
-        try {
-            const res = await fetch('/api/core/deploy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                alert("✅ Le cœur 5G de " + user.toUpperCase() + " est en cours d'installation !");
-            } else {
-                alert("❌ Erreur de déploiement. Vérifiez les ressources du cluster.");
-            }
-        } catch (e) { console.error(e); }
-        finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
+        if (res.ok) {
+            const result = await res.json();
+            alert("✅ Succès : " + result.message);
+        } else {
+            const errorDetail = await res.json();
+            alert("❌ Erreur : " + (errorDetail.detail || "Vérifiez les ressources du cluster"));
+        }
+    } catch (e) { 
+        console.error(e);
+        alert("❌ Erreur de connexion au serveur.");
+    } finally { 
+        btn.disabled = false; 
+        btn.innerText = "Lancer le déploiement automatique"; 
     }
+}
 
     // 3. Boucle de rafraîchissement des Pods (Filtré par Namespace)
     async function refreshPods() {

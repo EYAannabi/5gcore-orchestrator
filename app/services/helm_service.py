@@ -189,53 +189,59 @@ def get_helm_values(
 
 def build_helm_values(config) -> Dict[str, str]:
     """
-    Convert deployment configuration to Helm values.
-    
-    Args:
-        config: DeploymentConfig object
-        
-    Returns:
-        Dictionary of Helm key-value pairs
+    Convertit la configuration métier en valeurs techniques Helm.
+    C'est ici que réside l'intelligence de dimensionnement (Smart Sizing).
     """
+    
+    # --- LOGIQUE DE DIMENSIONNEMENT AUTOMATIQUE ---
+    # Si l'opérateur demande beaucoup d'abonnés, on force la haute disponibilité
+    # même s'il a oublié de le préciser dans le formulaire.
+    
+    calculated_upf = config.num_upf_replicas
+    calculated_amf = config.num_amf_replicas
+    
+    if config.num_subscribers > 5000:
+        logger.info(f"Dimensionnement auto : Augmentation des réplicas pour {config.num_subscribers} abonnés")
+        calculated_upf = max(calculated_upf, 2)
+        calculated_amf = max(calculated_amf, 2)
+
     values = {
-        # Global configuration
+        # Identification du propriétaire (Utile pour Huawei Admin)
+        "global.operatorName": config.operator_name,
         "global.projectName": config.deployment_name,
         
-        # PLMN configuration
+        # Configuration réseau PLMN
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
         
-        # Slice configuration
+        # Slicing
         "slice.type": config.slice_type.value,
         
-        # Replica counts
-        "upf.replicas": str(config.num_upf_replicas),
+        # Nombre de réplicas calculé intelligemment
+        "upf.replicas": str(calculated_upf),
         "smf.replicas": str(config.num_smf_replicas),
-        "amf.replicas": str(config.num_amf_replicas),
+        "amf.replicas": str(calculated_amf),
         
-        # Features
+        # Paramètres d'exposition
         "webui.enabled": "true" if config.expose_webui else "false",
         "prometheus.enabled": "true" if config.enable_prometheus else "false",
-        
-        # Monitoring
         "monitoring.enabled": "true" if config.monitoring_enabled else "false",
     }
     
-    # Add deployment mode specific settings
+    # --- STRATÉGIE DE DÉPLOIEMENT (Zero Downtime) ---
+    # On s'assure que Kubernetes utilise le RollingUpdate
+    values["global.deploymentStrategy"] = "RollingUpdate"
+    
+    # Gestion des ressources CPU/RAM selon le mode
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
-        values["affinity.enabled"] = "true"
     else:
         values["resources.requests.cpu"] = "100m"
         values["resources.requests.memory"] = "128Mi"
-        values["affinity.enabled"] = "false"
     
-    logger.info(f"Built Helm values for deployment: {config.deployment_name}")
-    logger.debug(f"Helm values: {values}")
-    
+    logger.info(f"Valeurs Helm générées pour {config.operator_name} ({config.deployment_name})")
     return values
-
 
 def normalize_upgrade_values(values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
