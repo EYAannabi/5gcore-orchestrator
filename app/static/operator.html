@@ -9,43 +9,50 @@
         .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1rem; }
         .nav-link { color: #cbd5e1; }
         .nav-link.active { color: white; font-weight: bold; }
+        .logo-container { background: white; padding: 10px; border-radius: 10px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
-            <nav class="col-md-2 sidebar">
-                <h4 id="operator-name" class="text-uppercase mb-4">Opérateur</h4>
-                <ul class="nav flex-column">
-                    <li class="nav-item"><a class="nav-link active" href="#">Déploiement</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Déconnexion</a></li>
+            <nav class="col-md-2 sidebar text-center">
+                <!-- LOGO DYNAMIQUE -->
+                <div class="logo-container">
+                    <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; height: 50px; object-fit: contain;">
+                </div>
+                <h4 id="operator-name" class="text-uppercase mb-4" style="font-size: 1.1rem;">Opérateur</h4>
+                
+                <ul class="nav flex-column text-start">
+                    <li class="nav-item"><a class="nav-link active" href="#">🚀 Déploiement</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">🔌 Déconnexion</a></li>
                 </ul>
             </nav>
+            
             <main class="col-md-10 p-4">
                 <h2>Déployer votre réseau 5G Core</h2>
-                <div class="card p-4 shadow-sm mb-4">
+                <div class="card p-4 shadow-sm mb-4 border-0">
                     <form id="deploy-form">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label>Nom du Site</label>
+                                <label class="form-label font-weight-bold">Nom du Site</label>
                                 <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Capacité (Nombre d'abonnés)</label>
+                                <label class="form-label font-weight-bold">Capacité (Abonnés)</label>
                                 <input type="number" id="subscribers" class="form-control" value="1000">
                             </div>
                         </div>
-                        <button type="button" onclick="handleDeploy()" class="btn btn-primary">Lancer le déploiement automatique</button>
+                        <button type="button" onclick="handleDeploy()" class="btn btn-primary px-4">Lancer le déploiement automatique</button>
                     </form>
                 </div>
 
-                <h3>État de vos microservices (Namespace: <span id="ns-display"></span>)</h3>
-                <table class="table table-hover bg-white rounded shadow-sm">
+                <h3>État des microservices (<span class="text-primary" id="ns-display"></span>)</h3>
+                <table class="table table-hover bg-white rounded shadow-sm overflow-hidden">
                     <thead class="table-dark">
-                        <tr><th>Pod Name</th><th>Status</th><th>IP</th></tr>
+                        <tr><th>NF (Network Function)</th><th>Status</th><th>IP Interface</th></tr>
                     </thead>
                     <tbody id="pods-table">
-                        <!-- Rempli par le JS -->
+                        <tr><td colspan="3" class="text-center">Chargement des données...</td></tr>
                     </tbody>
                 </table>
             </main>
@@ -57,11 +64,16 @@
     const user = localStorage.getItem('username');
     const role = localStorage.getItem('user_role');
     const ns = localStorage.getItem('namespace');
+    const logo = localStorage.getItem('user_logo');
 
+    // Sécurité : redirection si non connecté
     if (!user || role !== 'operator') { window.location.href = 'login.html'; }
 
+    // Affichage des infos
     document.getElementById('operator-name').innerText = user;
     document.getElementById('ns-display').innerText = ns;
+    // On pointe vers le dossier assets où sont tes images
+    document.getElementById('operator-logo').src = "/static/assets/" + logo;
 
     // 2. Fonction de Déploiement
     async function handleDeploy() {
@@ -70,13 +82,13 @@
         const btn = document.querySelector('button');
         
         btn.disabled = true;
-        btn.innerText = "Déploiement en cours...";
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement...';
 
         const payload = {
-            deployment_name: `${user}-core`, // ex: orange-core
-            namespace: ns,                   // ex: orange-5g
+            deployment_name: `${user}-core`, 
+            namespace: ns,                   
             num_subscribers: parseInt(subs),
-            operator_name: user              // Ajout pour le backend
+            operator_name: user              
         };
 
         try {
@@ -86,32 +98,37 @@
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
-                alert("✅ Déploiement lancé avec succès !");
+                alert("✅ Le cœur 5G de " + user.toUpperCase() + " est en cours d'installation !");
             } else {
-                alert("❌ Erreur lors du déploiement");
+                alert("❌ Erreur de déploiement. Vérifiez les ressources du cluster.");
             }
         } catch (e) { console.error(e); }
         finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
     }
 
-    // 3. Boucle de rafraîchissement des Pods
+    // 3. Boucle de rafraîchissement des Pods (Filtré par Namespace)
     async function refreshPods() {
         try {
             const res = await fetch(`/api/status/pods?namespace=${ns}`);
             const data = await res.json();
             const tbody = document.getElementById('pods-table');
             
+            if (data.pods.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Aucun service déployé</td></tr>';
+                return;
+            }
+
             tbody.innerHTML = data.pods.map(pod => `
                 <tr>
                     <td><strong>${pod.name}</strong></td>
                     <td><span class="badge ${pod.status === 'Running' ? 'bg-success' : 'bg-warning'}">${pod.status}</span></td>
-                    <td><code>${pod.ip || 'N/A'}</code></td>
+                    <td><code>${pod.ip || 'Provisioning...'}</code></td>
                 </tr>
             `).join('');
         } catch (e) { console.error("Erreur pods:", e); }
     }
 
-    setInterval(refreshPods, 3000); // Mise à jour toutes les 3 secondes
+    setInterval(refreshPods, 3000); 
     refreshPods();
 
     function logout() { localStorage.clear(); window.location.href = 'login.html'; }

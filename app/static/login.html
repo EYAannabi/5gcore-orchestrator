@@ -61,7 +61,7 @@
                 localStorage.setItem('user_role', data.role);
                 localStorage.setItem('username', data.username);
                 localStorage.setItem('namespace', data.namespace);
-
+                localStorage.setItem('user_logo', data.logo); 
                 // Redirection selon le rôle
                 if (data.role === 'admin') {
                     window.location.href = '/static/admin.html';

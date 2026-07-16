@@ -4,19 +4,29 @@
       "username": "orange",
       "password": "orange123",
       "role": "operator",
-      "namespace": "orange-5g"
+      "namespace": "orange-5g",
+      "logo": "Orange_logo.svg.webp"
     },
     {
       "username": "ooredoo",
       "password": "ooredoo123",
       "role": "operator",
-      "namespace": "ooredoo-5g"
+      "namespace": "ooredoo-5g",
+      "logo": "Ooredoo.svg"
+    },
+    {
+      "username": "tunisie-telecom",
+      "password": "tt123",
+      "role": "operator",
+      "namespace": "tt-5g",
+      "logo": "LOGO_TT_.jpg"
     },
     {
       "username": "huawei",
       "password": "admin123",
       "role": "admin",
-      "namespace": "all"
+      "namespace": "all",
+      "logo": "huawei_logo.png"
     }
   ]
 }
