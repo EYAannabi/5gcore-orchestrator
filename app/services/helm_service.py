@@ -195,33 +195,30 @@ def build_helm_values(config) -> Dict[str, str]:
     op_id = config.operator_name.lower().replace(' ', '-')
 
     values = {
-        # Identification
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
-        
-        # Réseau 5G
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
         "slice.type": config.slice_type.value,
         "upf.replicas": str(config.num_upf_replicas),
         "smf.replicas": str(config.num_smf_replicas),
         "amf.replicas": str(config.num_amf_replicas),
-        
-        # --- ISOLATION DES VOLUMES (ARCHITECTURE CIBLE) ---
-        # On désactive la création manuelle de PV si elle existe
+
+        # --- L'ISOLATION RADICALE ---
+        # On désactive la création du PV statique qui cause l'erreur
         "mongodb.persistence.enabled": "true",
-        
-        # On force l'utilisation du stockage dynamique de K3s
-        # K3s créera orange-pv, ooredoo-pv etc. automatiquement
         "mongodb.persistence.storageClass": "local-path",
         
-        # On donne un nom unique au PVC (le lien vers le disque)
+        # On change le nom du PVC pour qu'il soit unique
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
         
-        # On renomme le service MongoDB pour éviter les conflits réseau
+        # On change le nom de l'instance MongoDB pour éviter les conflits de nommage
         "mongodb.fullnameOverride": f"mongodb-{op_id}",
 
-        # Monitoring & WebUI
+        # TRÈS IMPORTANT : On dit au chart d'ignorer le PV statique par défaut
+        "mongodb.persistence.existingClaim": "", 
+        "mongodb.persistence.pvName": f"pv-dynamic-{op_id}", 
+        
         "webui.enabled": "true" if config.expose_webui else "false",
         "prometheus.enabled": "true" if config.enable_prometheus else "false",
         "global.deploymentStrategy": "RollingUpdate",
