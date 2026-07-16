@@ -189,131 +189,53 @@ def get_helm_values(
 
 def build_helm_values(config) -> Dict[str, str]:
     """
-    Convertit la configuration métier en valeurs techniques Helm.
-    Cette version résout les conflits de PersistentVolumes pour le multi-opérateur.
+    Génère une configuration isolée pour chaque opérateur.
+    Cette version force K3s à créer des volumes uniques par namespace.
     """
-    
-    # --- LOGIQUE DE DIMENSIONNEMENT AUTOMATIQUE (SMART SIZING) ---
-    # Si l'opérateur demande plus de 5000 abonnés, on augmente les ressources
-    calculated_upf = config.num_upf_replicas
-    calculated_amf = config.num_amf_replicas
-    
-    if config.num_subscribers > 5000:
-        logger.info(f"Dimensionnement auto : Haute disponibilité activée pour {config.num_subscribers} abonnés")
-        calculated_upf = max(calculated_upf, 2)
-        calculated_amf = max(calculated_amf, 2)
-
-    # Nettoyage du nom de l'opérateur pour les ressources K8s
     op_id = config.operator_name.lower().replace(' ', '-')
 
     values = {
-        # Identification du propriétaire
+        # Identification
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
         
-        # Configuration réseau PLMN
+        # Réseau 5G
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
-        
-        # Slicing
         "slice.type": config.slice_type.value,
-        
-        # Nombre de réplicas calculé
-        "upf.replicas": str(calculated_upf),
+        "upf.replicas": str(config.num_upf_replicas),
         "smf.replicas": str(config.num_smf_replicas),
-        "amf.replicas": str(calculated_amf),
+        "amf.replicas": str(config.num_amf_replicas),
         
-        # --- SOLUTION MULTI-OPÉRATEUR (ISOLATION DES VOLUMES) ---
-        # On rend les noms des PersistentVolumeClaims uniques par opérateur
+        # --- ISOLATION DES VOLUMES (ARCHITECTURE CIBLE) ---
+        # On désactive la création manuelle de PV si elle existe
+        "mongodb.persistence.enabled": "true",
+        
+        # On force l'utilisation du stockage dynamique de K3s
+        # K3s créera orange-pv, ooredoo-pv etc. automatiquement
+        "mongodb.persistence.storageClass": "local-path",
+        
+        # On donne un nom unique au PVC (le lien vers le disque)
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
-        "mongodb.persistence.storageClass": "local-path", # Utilise le stockage dynamique de K3s
-        "mongodb.persistence.size": "8Gi",
         
-        # Paramètres d'exposition et monitoring
+        # On renomme le service MongoDB pour éviter les conflits réseau
+        "mongodb.fullnameOverride": f"mongodb-{op_id}",
+
+        # Monitoring & WebUI
         "webui.enabled": "true" if config.expose_webui else "false",
         "prometheus.enabled": "true" if config.enable_prometheus else "false",
-        "monitoring.enabled": "true" if config.monitoring_enabled else "false",
-        
-        # Stratégie de mise à jour sans coupure (NetDevOps)
         "global.deploymentStrategy": "RollingUpdate",
     }
     
-    # Gestion des ressources CPU/RAM selon le mode choisi
+    # Ressources CPU/RAM
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
-        values["affinity.enabled"] = "true"
     else:
         values["resources.requests.cpu"] = "100m"
         values["resources.requests.memory"] = "128Mi"
-        values["affinity.enabled"] = "false"
     
-    logger.info(f"✅ Valeurs Helm générées avec isolation pour : {op_id}")
     return values
-def upgrade_release(
-    deployment_name: str = "free5gc-helm",
-    namespace: str = "free5gc",
-    chart_path: Optional[str] = None,
-    values: Optional[Dict[str, Any]] = None
-) -> Tuple[bool, str, str, Optional[int]]:
-    """
-    Upgrade a Free5GC Helm release with new values.
-    
-    Args:
-        deployment_name: Release name to upgrade
-        namespace: Kubernetes namespace
-        chart_path: Path to Helm chart
-        values: New values to apply
-        
-    Returns:
-        Tuple of (success: bool, stdout: str, stderr: str, new_revision: Optional[int])
-    """
-    try:
-        if chart_path is None:
-            chart_path = os.path.expanduser("~/free5gc-helm/charts/free5gc")
-        
-        cmd = ["helm", "upgrade", deployment_name, chart_path]
-        cmd.extend(["--namespace", namespace])
-        cmd.append("--reuse-values")
-        
-        if values:
-            for key, value in values.items():
-                cmd.extend(["--set", f"{key}={_format_helm_value(value)}"])
-        
-        logger.info(f"Executing Helm upgrade: {' '.join(cmd)}")
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        
-        if result.returncode == 0:
-            # Extract new revision from output
-            new_revision = None
-            if "release upgraded successfully" in result.stdout.lower():
-                # Parse revision from output if available
-                lines = result.stdout.split('\n')
-                for line in lines:
-                    if 'revision' in line.lower():
-                        try:
-                            parts = line.split()
-                            new_revision = int(parts[-1])
-                        except:
-                            pass
-            
-            logger.info(f"Successfully upgraded {deployment_name} in namespace {namespace}")
-            return True, result.stdout, result.stderr, new_revision
-        else:
-            error_msg = f"Helm upgrade failed: {result.stderr}"
-            logger.error(error_msg)
-            return False, result.stdout, error_msg, None
-            
-    except subprocess.TimeoutExpired:
-        error = "Helm upgrade timed out after 5 minutes"
-        logger.error(error)
-        return False, "", error, None
-    except Exception as e:
-        error = f"Error during Helm upgrade: {str(e)}"
-        logger.error(error)
-        return False, "", error, None
-
 
 def rollback_release(
     deployment_name: str = "free5gc-helm",
