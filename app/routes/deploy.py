@@ -4,40 +4,35 @@ Handles Free5GC deployment lifecycle management with Multi-Operator isolation.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, Query
 from app.services.helm_service import (
     deploy_free5gc, 
     clean_free5gc, 
-    build_helm_values, 
-    get_deployment_status
+    build_helm_values
 )
 from app.services.kubernetes_service import check_deployment_status
 from app.models.deployment import DeploymentConfig, DeploymentResponse, DeploymentStatus
 
 logger = logging.getLogger(__name__)
 
-# On garde le préfixe /core pour la cohérence avec ton frontend
 router = APIRouter(prefix="/core", tags=["Orchestration"])
 
 @router.post("/deploy", response_model=DeploymentResponse)
 async def deploy(config: DeploymentConfig):
     """
-    Déploie un cœur 5G pour un opérateur spécifique.
-    Le namespace est envoyé par le frontend (basé sur le login de l'utilisateur).
+    Déploie un cœur 5G isolé pour Orange, Ooredoo ou Tunisie Telecom.
     """
     try:
-        # On logue l'intention de déploiement
-        logger.info(f"--- Nouveau Déploiement ---")
-        logger.info(f"Opérateur: {config.operator_name}")
-        logger.info(f"Nom Release: {config.deployment_name}")
-        logger.info(f"Namespace Cible: {config.namespace}")
-
-        # Conversion de la config en valeurs Helm
+        # 1. Logs de traçabilité (Audit Trail)
+        logger.info(f"--- Requête de déploiement NetDevOps ---")
+        logger.info(f"Utilisateur: {config.operator_name}")
+        logger.info(f"Namespace: {config.namespace}")
+        
+        # 2. Préparation des paramètres Helm
         helm_values = build_helm_values(config)
         
-        # Exécution du déploiement via Helm
-        # create_namespace=True garantit que si c'est le premier déploiement d'Orange, 
-        # le namespace orange-5g sera créé automatiquement.
+        # 3. Exécution du déploiement
+        # On utilise create_namespace=True pour automatiser la création des espaces isolés
         success, stdout, stderr = deploy_free5gc(
             deployment_name=config.deployment_name,
             namespace=config.namespace,
@@ -47,72 +42,56 @@ async def deploy(config: DeploymentConfig):
         )
         
         if success:
-            logger.info(f"✅ Déploiement {config.deployment_name} réussi dans {config.namespace}")
+            logger.info(f"✅ Réseau 5G déployé pour {config.operator_name}")
             return DeploymentResponse(
                 status="Success",
-                message=f"Le réseau 5G '{config.deployment_name}' a été déployé avec succès.",
+                message=f"Réseau 5G de {config.operator_name} (Site: {config.deployment_name}) initialisé.",
                 deployment_name=config.deployment_name,
                 namespace=config.namespace,
-                output=stdout
+                output="Helm install completed successfully"
             )
         else:
-            logger.error(f"❌ Échec Helm: {stderr}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Erreur lors de l'installation Helm: {stderr}"
-            )
+            logger.error(f"❌ Échec Helm pour {config.operator_name}: {stderr}")
+            raise HTTPException(status_code=400, detail=f"Erreur Helm: {stderr}")
     
     except Exception as e:
-        logger.error(f"💥 Erreur système: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur interne du serveur: {str(e)}"
-        )
+        logger.error(f"💥 Erreur Critique Deploy: {str(e)}")
+        # C'est ici que l'erreur 'operator_name' disparaîtra après avoir mis à jour le modèle
+        raise HTTPException(status_code=500, detail=f"Erreur Interne: {str(e)}")
 
 @router.delete("/clean", response_model=DeploymentResponse)
 async def clean(
-    deployment_name: str = Query(..., description="Le nom de la release à supprimer"), 
-    namespace: str = Query(..., description="Le namespace de l'opérateur")
+    deployment_name: str = Query(..., description="Nom de la release"), 
+    namespace: str = Query(..., description="Namespace de l'opérateur")
 ):
     """
-    Supprime un déploiement spécifique. 
-    Les paramètres sont obligatoires (Query(...,)) pour éviter les erreurs.
+    Supprime proprement le réseau d'un opérateur sans toucher aux autres.
     """
     try:
-        logger.info(f"Suppression du réseau {deployment_name} dans {namespace}")
-        
-        success, stdout, stderr = clean_free5gc(
-            deployment_name=deployment_name,
-            namespace=namespace
-        )
+        logger.info(f"Nettoyage demandé par l'opérateur dans {namespace}")
+        success, stdout, stderr = clean_free5gc(deployment_name, namespace)
         
         if success:
             return DeploymentResponse(
                 status="Success",
-                message=f"Réseau '{deployment_name}' supprimé de l'espace {namespace}",
+                message=f"Le réseau {deployment_name} a été supprimé du namespace {namespace}.",
                 output=stdout
             )
         else:
-            # Si le déploiement n'existe déjà plus, on ne renvoie pas d'erreur
             if "not found" in stderr.lower():
-                return DeploymentResponse(
-                    status="Success",
-                    message="Réseau déjà supprimé ou introuvable."
-                )
+                return DeploymentResponse(status="Success", message="Réseau déjà inexistant.")
             raise HTTPException(status_code=400, detail=stderr)
-    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status", response_model=DeploymentStatus)
 async def get_status(namespace: str = Query(..., description="Namespace à surveiller")):
     """
-    Récupère le statut des microservices d'un opérateur.
+    Retourne l'état des Pods pour l'opérateur connecté.
     """
     try:
-        # On vérifie uniquement le namespace de l'opérateur connecté
-        status = check_deployment_status(namespace=namespace)
-        return DeploymentStatus(**status)
+        status_data = check_deployment_status(namespace=namespace)
+        return DeploymentStatus(**status_data)
     except Exception as e:
-        logger.error(f"Erreur status namespace {namespace}: {e}")
-        raise HTTPException(status_code=500, detail="Impossible de récupérer l'état des Pods")
+        logger.error(f"Erreur status pour {namespace}: {e}")
+        raise HTTPException(status_code=500, detail="Impossible de lire les données Kubernetes")

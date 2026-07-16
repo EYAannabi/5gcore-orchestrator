@@ -3,16 +3,20 @@ Pydantic models for deployment configuration and API responses.
 Provides type validation and automatic OpenAPI documentation.
 """
 
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List
-from enum import Enum
+# app/models/deployment.py
+from pydantic import BaseModel, Field
+from typing import Optional
 
-
-class DeploymentMode(str, Enum):
-    """Deployment environment modes"""
-    DEVELOPMENT = "development"
-    PRODUCTION = "production"
-
+class DeploymentConfig(BaseModel):
+    deployment_name: str
+    namespace: str
+    operator_name: str  # <--- AJOUTE CETTE LIGNE (Obligatoire)
+    num_subscribers: int = 1000
+    num_upf_replicas: int = 1
+    num_smf_replicas: int = 1
+    num_amf_replicas: int = 1
+    helm_chart_path: Optional[str] = None
+    # ... garde les autres champs existants
 
 class SliceType(str, Enum):
     """Network slice types for 5G"""
