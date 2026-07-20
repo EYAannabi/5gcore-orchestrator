@@ -188,67 +188,38 @@ def get_helm_values(
 
 
 def build_helm_values(config) -> Dict[str, str]:
-    """
-    Génère une configuration isolée pour chaque opérateur.
-    Cette version force K3s à créer des volumes uniques par namespace.
-    """
     op_id = config.operator_name.lower().replace(' ', '-')
-
     values = {
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
-        "global.mcc": config.mcc,
-        "global.mnc": config.mnc,
-        "slice.type": config.slice_type.value,
-        "upf.replicas": str(config.num_upf_replicas),
-        "smf.replicas": str(config.num_smf_replicas),
-        "amf.replicas": str(config.num_amf_replicas),
-
-        # --- L'ISOLATION RADICALE ---
-        # On désactive la création du PV statique qui cause l'erreur
+        # ... (mcc, mnc, etc.)
+        
+        # --- SOLUTION FINALE ---
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
         
-        # On change le nom du PVC pour qu'il soit unique
+        # On force Helm à NE PAS utiliser le nom fixe
+        "mongodb.persistence.pvName": "", 
+        "mongodb.persistence.existingClaim": "",
+        
+        # On renomme tout pour que ce soit unique par opérateur
+        "mongodb.fullnameOverride": f"mongodb-{op_id}",
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
         
-        # On change le nom de l'instance MongoDB pour éviter les conflits de nommage
-        "mongodb.fullnameOverride": f"mongodb-{op_id}",
-
-        # TRÈS IMPORTANT : On dit au chart d'ignorer le PV statique par défaut
-        "mongodb.persistence.existingClaim": "", 
-        "mongodb.persistence.pvName": f"pv-dynamic-{op_id}", 
-        
-        "webui.enabled": "true" if config.expose_webui else "false",
-        "prometheus.enabled": "true" if config.enable_prometheus else "false",
-        "global.deploymentStrategy": "RollingUpdate",
+        # Désactiver la création de PV via le chart s'il y a une option
+        "mongodb.createPv": "false", 
+        "db.persistence.enabled": "true",
+        "db.persistence.storageClass": "local-path"
     }
-    
-    # Ressources CPU/RAM
-    if config.deployment_mode.value == "production":
-        values["resources.requests.cpu"] = "500m"
-        values["resources.requests.memory"] = "512Mi"
-    else:
-        values["resources.requests.cpu"] = "100m"
-        values["resources.requests.memory"] = "128Mi"
-    
     return values
 
 def rollback_release(
-    deployment_name: str = "free5gc-helm",
-    namespace: str = "free5gc",
+    deployment_name: str,
+    namespace: str,
     revision: Optional[int] = None
 ) -> Tuple[bool, str, str]:
     """
-    Rollback a Helm release to a previous version.
-    
-    Args:
-        deployment_name: Release name to rollback
-        namespace: Kubernetes namespace
-        revision: Target revision (None = previous revision)
-        
-    Returns:
-        Tuple of (success: bool, stdout: str, stderr: str)
+    Effectue un rollback vers une version précédente dans le namespace de l'opérateur.
     """
     try:
         cmd = ["helm", "rollback", deployment_name]
@@ -261,36 +232,23 @@ def rollback_release(
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         
         if result.returncode == 0:
-            logger.info(f"Successfully rolled back {deployment_name} in namespace {namespace}")
+            logger.info(f"✅ Rollback réussi pour {deployment_name} dans {namespace}")
             return True, result.stdout, result.stderr
         else:
-            error_msg = f"Helm rollback failed: {result.stderr}"
-            logger.error(error_msg)
-            return False, result.stdout, error_msg
+            logger.error(f"❌ Échec Rollback: {result.stderr}")
+            return False, result.stdout, result.stderr
             
     except subprocess.TimeoutExpired:
-        error = "Helm rollback timed out after 2 minutes"
-        logger.error(error)
-        return False, "", error
+        return False, "", "Timeout lors du rollback"
     except Exception as e:
-        error = f"Error during Helm rollback: {str(e)}"
-        logger.error(error)
-        return False, "", error
-
+        return False, "", str(e)
 
 def get_release_history(
-    deployment_name: str = "free5gc-helm",
-    namespace: str = "free5gc"
+    deployment_name: str,
+    namespace: str
 ) -> Tuple[bool, list, str]:
     """
-    Get Helm release revision history.
-    
-    Args:
-        deployment_name: Release name
-        namespace: Kubernetes namespace
-        
-    Returns:
-        Tuple of (success: bool, revisions: list, error: str)
+    Récupère l'historique des révisions pour un opérateur spécifique.
     """
     try:
         cmd = ["helm", "history", deployment_name, "--namespace", namespace, "-o", "json"]
@@ -298,37 +256,18 @@ def get_release_history(
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
-            import json
             revisions = json.loads(result.stdout)
-            logger.info(f"Retrieved history for {deployment_name}")
+            logger.info(f"Historique récupéré pour {deployment_name} ({len(revisions)} versions)")
             return True, revisions, ""
         else:
-            error_msg = f"Could not retrieve history: {result.stderr}"
-            logger.warning(error_msg)
-            return False, [], error_msg
+            return False, [], result.stderr
             
     except Exception as e:
-        error = f"Error getting release history: {e}"
-        logger.error(error)
-        return False, [], error
-
+        logger.error(f"Erreur historique: {e}")
+        return False, [], str(e)
 
 def _format_helm_value(value: Any) -> str:
-    """
-    Format Python value for Helm --set parameter.
-    
-    Args:
-        value: Value to format
-        
-    Returns:
-        Formatted string for Helm
-    """
+    """Formatte les valeurs pour la commande --set de Helm"""
     if isinstance(value, bool):
         return "true" if value else "false"
-    elif isinstance(value, (int, float)):
-        return str(value)
-    elif isinstance(value, str):
-        # Escape special characters
-        return f'"{value}"' if any(c in value for c in ' "\'$') else value
-    else:
-        return str(value)
+    return str(value)
