@@ -195,55 +195,22 @@ def build_helm_values(config) -> Dict[str, str]:
     # Nettoyage de l'identifiant pour la compatibilité Kubernetes
     op_id = config.operator_name.lower().replace(' ', '-')
     
-    # --- LOGIQUE DE DIMENSIONNEMENT INTELLIGENT (NETDEVOPS) ---
-    # On ajuste automatiquement les ressources si le nombre d'abonnés est important
-    calculated_upf = config.num_upf_replicas
-    calculated_amf = config.num_amf_replicas
-    
-    if config.num_subscribers > 5000:
-        logger.info(f"Smart Sizing : Haute disponibilité activée pour {op_id} (>5000 abonnés)")
-        calculated_upf = max(calculated_upf, 2)
-        calculated_amf = max(calculated_amf, 2)
-
-    # --- CONSTRUCTION DU DICTIONNAIRE DE VALEURS ---
     values = {
-        # Identification et Traçabilité
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
-        
-        # Paramètres 5G Core
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
-        "slice.type": config.slice_type.value,
         
-        # Scaling des fonctions réseau
-        "upf.replicas": str(calculated_upf),
-        "smf.replicas": str(config.num_smf_replicas),
-        "amf.replicas": str(calculated_amf),
-
-        # --- ISOLATION MULTI-OPÉRATEUR DU STOCKAGE (CRITIQUE) ---
-        # On renomme l'instance pour que le service s'appelle 'mongodb-orange' etc.
+        # --- ISOLATION MULTI-OPÉRATEUR ---
         "mongodb.fullnameOverride": f"mongodb-{op_id}",
-        
-        # Activation du stockage dynamique K3s (remplace le PV statique supprimé)
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
-        
-        # ON FORCE L'IGNORANCE DES NOMS STATIQUES QUI BLOQUAIENT
-        # En laissant pvName vide, Kubernetes génère un ID unique automatiquement
-        "mongodb.persistence.pvName": "",
-        "mongodb.persistence.existingClaim": "",
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
-        
-        # Sécurité supplémentaire pour désactiver toute création de PV manuel par le chart
-        "mongodb.createPv": "false",
-        "db.persistence.enabled": "true",
-        "db.persistence.storageClass": "local-path",
 
-        # Paramètres d'exposition et mise à jour sans coupure
+        # ON NE PASSE PLUS pvName et existingClaim s'ils sont vides
+        # Cela évite l'erreur "resource name may not be empty"
+
         "webui.enabled": "true" if config.expose_webui else "false",
-        "prometheus.enabled": "true" if config.enable_prometheus else "false",
-        "monitoring.enabled": "true" if config.monitoring_enabled else "false",
         "global.deploymentStrategy": "RollingUpdate",
     }
     

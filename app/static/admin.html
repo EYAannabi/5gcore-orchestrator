@@ -5,43 +5,76 @@
     <title>Huawei Admin - Supervision Globale</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body { background: #0f172a; color: white; }
-        .topbar { background: #d71920; padding: 10px 20px; font-weight: bold; }
-        .dashboard-container { padding: 20px; }
-        iframe { border: 1px solid #334155; border-radius: 8px; background: #1e293b; }
+        body { background: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
+        .topbar { background: #d71920; padding: 15px 25px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .dashboard-container { padding: 30px; }
+        .card-stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: 0.3s; }
+        .card-stat:hover { border-color: #d71920; }
+        iframe { border: 2px solid #334155; border-radius: 12px; background: #1e293b; margin-top: 20px; min-height: 600px; }
     </style>
 </head>
 <body>
-    <div class="topbar d-flex justify-content-between">
-        <span>HUAWEI ADMIN - 5G CORE MONITORING</span>
-        <button onclick="logout()" class="btn btn-sm btn-light">Déconnexion</button>
+    <div class="topbar d-flex justify-content-between align-items-center">
+        <span>🚀 HUAWEI 5G CORE - CONTRÔLEUR RÉSEAU CLOUD-NATIVE</span>
+        <button onclick="logout()" class="btn btn-sm btn-outline-light">Déconnexion</button>
     </div>
 
     <div class="dashboard-container">
         <div class="row mb-4">
             <div class="col-md-3">
-                <div class="card bg-dark text-white border-secondary p-3">
-                    <h6>Total Namespaces</h6>
-                    <h2 class="text-danger">3</h2>
+                <div class="card-stat">
+                    <h6 class="text-secondary">Opérateurs Actifs</h6>
+                    <h2 class="text-danger" id="total-ns">0</h2> <!-- ID AJOUTÉ ICI -->
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card bg-dark text-white border-secondary p-3">
-                    <h6>K3s Node Status</h6>
-                    <h2 class="text-success">Healthy</h2>
+                <div class="card-stat">
+                    <h6 class="text-secondary">Statut Cluster K3s</h6>
+                    <h2 class="text-success" id="cluster-status">Healthy</h2>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card-stat">
+                    <h6 class="text-secondary">Namespaces Détectés</h6>
+                    <div id="ns-list" style="font-size: 0.9rem;" class="text-info">Recherche...</div>
                 </div>
             </div>
         </div>
 
-        <h4>Supervision en temps réel (Prometheus / Grafana)</h4>
+        <div class="d-flex justify-content-between align-items-end">
+            <h4>Supervision Temps Réel (Prometheus / Grafana)</h4>
+            <span class="badge bg-secondary mb-2">Rafraîchissement : 5s</span>
+        </div>
+        
         <div class="ratio ratio-16x9">
-            <!-- Remplacer l'URL par celle de ton Grafana local -->
-            <iframe src="http://192.168.x.x:3000/d/free5gc-dashboard?orgId=1&refresh=5s&kiosk" allowfullscreen></iframe>
+            <!-- Remplace l'IP ci-dessous par l'IP de ton serveur -->
+            <iframe id="grafana-frame" src="http://192.168.140.128:3000/d/free5gc-dashboard?orgId=1&refresh=5s&kiosk" allowfullscreen></iframe>
         </div>
     </div>
 
     <script>
-        function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+        async function refreshStats() {
+            try {
+                // Cette route doit être créée dans app/routes/pods.py
+                const res = await fetch('/api/status/stats/global');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                document.getElementById('total-ns').innerText = data.total_operators;
+                document.getElementById('ns-list').innerText = data.namespaces.join(' | ');
+            } catch (e) {
+                console.error("Erreur stats admin:", e);
+            }
+        }
+
+        // Mise à jour toutes les 5 secondes
+        setInterval(refreshStats, 5000);
+        refreshStats();
+
+        function logout() { 
+            localStorage.clear(); 
+            window.location.href = 'login.html'; 
+        }
     </script>
 </body>
 </html>

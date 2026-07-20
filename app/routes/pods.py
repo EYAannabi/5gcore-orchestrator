@@ -108,3 +108,21 @@ async def restart_pod(pod_name: str, namespace: str = "free5gc"):
     except Exception as e:
         logger.error(f"Error restarting pod: {e}")
         raise HTTPException(status_code=500, detail=f"Error restarting pod: {str(e)}")
+@router.get("/stats/global")
+async def get_global_stats():
+    """Route pour le Dashboard Huawei Admin"""
+    try:
+        from app.services.kubernetes_service import list_pods
+        # On récupère tous les pods de tous les namespaces pour compter les opérateurs
+        # Si tu n'as pas de fonction list_namespaces, on peut déduire via les pods
+        all_pods = list_pods(namespace=None) # Modifie list_pods pour accepter None (all namespaces)
+        
+        # On extrait les namespaces qui finissent par -5g (nos opérateurs)
+        namespaces = list(set([p['namespace'] for p in all_pods if p['namespace'].endswith('-5g')]))
+        
+        return {
+            "total_operators": len(namespaces),
+            "namespaces": namespaces
+        }
+    except Exception as e:
+        return {"total_operators": 0, "namespaces": [], "error": str(e)}

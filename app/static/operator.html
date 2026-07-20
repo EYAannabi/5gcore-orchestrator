@@ -2,156 +2,199 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Portail Opérateur - 5G Core</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portail Opérateur - 5G Core Orchestrator</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body { background: #f8fafc; }
-        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1rem; }
-        .nav-link { color: #cbd5e1; }
-        .nav-link.active { color: white; font-weight: bold; }
-        .logo-container { background: white; padding: 10px; border-radius: 10px; margin-bottom: 20px; }
+        body { background: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 250px; }
+        .main-content { margin-left: 250px; padding: 2rem; }
+        .nav-link { color: #cbd5e1; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; transition: 0.3s; }
+        .nav-link:hover { background: #334155; color: white; }
+        .nav-link.active { background: #2563eb; color: white; font-weight: bold; }
+        .logo-container { background: white; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 80px; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .status-badge { font-weight: 600; padding: 0.5em 0.8em; }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <nav class="col-md-2 sidebar text-center">
-                <!-- LOGO DYNAMIQUE -->
-                <div class="logo-container">
-                    <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; height: 50px; object-fit: contain;">
-                </div>
-                <h4 id="operator-name" class="text-uppercase mb-4" style="font-size: 1.1rem;">Opérateur</h4>
-                
-                <ul class="nav flex-column text-start">
-                    <li class="nav-item"><a class="nav-link active" href="#">🚀 Déploiement</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">🔌 Déconnexion</a></li>
-                </ul>
-            </nav>
+    <div class="container-fluid p-0">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo-container">
+                <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 60px; object-fit: contain;">
+            </div>
+            <h5 id="operator-display-name" class="text-center text-uppercase mb-4" style="letter-spacing: 1px; color: #94a3b8;">Chargement...</h5>
             
-            <main class="col-md-10 p-4">
-                <h2>Déployer votre réseau 5G Core</h2>
-                <div class="card p-4 shadow-sm mb-4 border-0">
-                    <form id="deploy-form">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label font-weight-bold">Nom du Site</label>
-                                <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label font-weight-bold">Capacité (Abonnés)</label>
-                                <input type="number" id="subscribers" class="form-control" value="1000">
-                            </div>
-                        </div>
-                        <button type="button" onclick="handleDeploy()" class="btn btn-primary px-4">Lancer le déploiement automatique</button>
-                    </form>
-                </div>
+            <ul class="nav flex-column">
+                <li class="nav-item"><a class="nav-link active" href="#">🚀 Déploiement</a></li>
+                <li class="nav-item"><a class="nav-link" href="/static/admin.html" id="admin-link" style="display:none;">🛠 Administration</a></li>
+                <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" onclick="logout()">🔌 Déconnexion</a></li>
+            </ul>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Tableau de bord Opérateur</h2>
+                <div class="badge bg-primary fs-6 p-2">Namespace : <span id="ns-display">...</span></div>
+            </div>
 
-                <h3>État des microservices (<span class="text-primary" id="ns-display"></span>)</h3>
-                <table class="table table-hover bg-white rounded shadow-sm overflow-hidden">
+            <div class="card p-4 mb-4">
+                <h4 class="mb-3">Déployer un nouveau site 5G</h4>
+                <form id="deploy-form">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Nom du Site (Ville/Zone)</label>
+                            <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre" required>
+                            <small class="text-muted">Sera utilisé pour nommer les microservices.</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Capacité Estimée (Abonnés)</label>
+                            <input type="number" id="subscribers" class="form-control" value="1000" min="100" step="100">
+                            <small class="text-muted">Le système ajustera les ressources automatiquement.</small>
+                        </div>
+                    </div>
+                    <button type="button" id="deploy-btn" onclick="handleDeploy()" class="btn btn-primary px-5 py-2">Lancer le déploiement automatique</button>
+                </form>
+            </div>
+
+            <h4 class="mb-3">État des microservices 5G Core</h4>
+            <div class="card overflow-hidden">
+                <table class="table table-hover mb-0">
                     <thead class="table-dark">
-                        <tr><th>NF (Network Function)</th><th>Status</th><th>IP Interface</th></tr>
+                        <tr>
+                            <th>Network Function (NF)</th>
+                            <th>Statut</th>
+                            <th>Adresse IP Interne</th>
+                        </tr>
                     </thead>
                     <tbody id="pods-table">
-                        <tr><td colspan="3" class="text-center">Chargement des données...</td></tr>
+                        <tr><td colspan="3" class="text-center p-4 text-muted">Initialisation de la connexion avec le cluster...</td></tr>
                     </tbody>
                 </table>
-            </main>
-        </div>
+            </div>
+        </main>
     </div>
 
     <script>
-    // 1. Récupération des infos de session
-    const user = localStorage.getItem('username');
+    // 1. Initialisation de la session
+    const username = localStorage.getItem('username');
     const role = localStorage.getItem('user_role');
     const ns = localStorage.getItem('namespace');
     const logo = localStorage.getItem('user_logo');
 
-    // Sécurité : redirection si non connecté
-    if (!user || role !== 'operator') { window.location.href = 'login.html'; }
+    // Vérification de sécurité (Evite l'erreur du namespace "C")
+    if (!username || !ns || ns.length < 3) {
+        console.error("Session invalide détectée");
+        window.location.href = 'login.html';
+    }
 
-    // Affichage des infos
-    document.getElementById('operator-name').innerText = user;
+    // Affichage des éléments dynamiques
+    document.getElementById('operator-display-name').innerText = username;
     document.getElementById('ns-display').innerText = ns;
-    // On pointe vers le dossier assets où sont tes images
-    document.getElementById('operator-logo').src = "/static/assets/" + logo;
+    document.getElementById('operator-logo').src = "/static/assets/" + (logo || "default.png");
+
+    if (role === 'admin') {
+        document.getElementById('admin-link').style.display = 'block';
+    }
 
     // 2. Fonction de Déploiement
     async function handleDeploy() {
-    const site = document.getElementById('site-name').value || "site-default";
-    const subs = document.getElementById('subscribers').value;
-    const btn = document.querySelector('button');
-    
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement...';
-
-    // On prépare un objet complet qui correspond au modèle DeploymentConfig (Python)
-    const payload = {
-        deployment_name: `${user}-core`.toLowerCase().replace(/\s+/g, '-'), 
-        namespace: ns,                   
-        operator_name: user,
-        num_subscribers: parseInt(subs),
-        // On ajoute les valeurs par défaut pour éviter l'erreur 422
-        mcc: "208",
-        mnc: "93",
-        num_upf_replicas: 1,
-        num_smf_replicas: 1,
-        num_amf_replicas: 1,
-        slice_type: "eMBB",
-        deployment_mode: "development",
-        monitoring_enabled: true,
-        expose_webui: true,
-        enable_prometheus: true
-    };
-
-    try {
-        const res = await fetch('/api/core/deploy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const siteInput = document.getElementById('site-name').value;
+        const subs = document.getElementById('subscribers').value;
+        const btn = document.getElementById('deploy-btn');
         
-        if (res.ok) {
-            const result = await res.json();
-            alert("✅ Succès : " + result.message);
-        } else {
-            const errorDetail = await res.json();
-            alert("❌ Erreur : " + (errorDetail.detail || "Vérifiez les ressources du cluster"));
+        if (!siteInput) {
+            alert("Veuillez donner un nom au site.");
+            return;
         }
-    } catch (e) { 
-        console.error(e);
-        alert("❌ Erreur de connexion au serveur.");
-    } finally { 
-        btn.disabled = false; 
-        btn.innerText = "Lancer le déploiement automatique"; 
-    }
-}
 
-    // 3. Boucle de rafraîchissement des Pods (Filtré par Namespace)
+        // Nettoyage du nom pour Kubernetes (minuscules, pas d'espaces)
+        const cleanSiteName = siteInput.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement en cours...';
+
+        // Objet complet correspondant à DeploymentConfig dans deployment.py
+        const payload = {
+            operator_name: username,
+            deployment_name: cleanSiteName + "-core", 
+            namespace: ns,                   
+            num_subscribers: parseInt(subs),
+            mcc: "208",
+            mnc: "93",
+            num_upf_replicas: 1,
+            num_smf_replicas: 1,
+            num_amf_replicas: 1,
+            slice_type: "eMBB",
+            deployment_mode: "development",
+            monitoring_enabled: true,
+            expose_webui: true,
+            enable_prometheus: true
+        };
+
+        try {
+            const res = await fetch('/api/core/deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await res.json();
+
+            if (res.ok) {
+                alert("✅ SUCCÈS : " + result.message);
+            } else {
+                alert("❌ ERREUR : " + (result.detail || "Le déploiement a échoué."));
+            }
+        } catch (e) { 
+            console.error(e);
+            alert("❌ Erreur critique de connexion au serveur.");
+        } finally { 
+            btn.disabled = false; 
+            btn.innerText = "Lancer le déploiement automatique"; 
+        }
+    }
+
+    // 3. Rafraîchissement automatique des Pods
     async function refreshPods() {
         try {
             const res = await fetch(`/api/status/pods?namespace=${ns}`);
+            if (!res.ok) return;
             const data = await res.json();
             const tbody = document.getElementById('pods-table');
             
-            if (data.pods.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Aucun service déployé</td></tr>';
+            if (!data.pods || data.pods.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted">Aucun service déployé sur ce site</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.pods.map(pod => `
+            tbody.innerHTML = data.pods.map(pod => {
+                let statusClass = "bg-warning";
+                if (pod.status === "Running") statusClass = "bg-success";
+                if (pod.status === "Failed" || pod.status === "Error") statusClass = "bg-danger";
+
+                return `
                 <tr>
-                    <td><strong>${pod.name}</strong></td>
-                    <td><span class="badge ${pod.status === 'Running' ? 'bg-success' : 'bg-warning'}">${pod.status}</span></td>
-                    <td><code>${pod.ip || 'Provisioning...'}</code></td>
+                    <td><span class="fw-bold text-dark">${pod.name}</span></td>
+                    <td><span class="badge ${statusClass} status-badge">${pod.status}</span></td>
+                    <td><code class="text-primary">${pod.ip || 'Allocation...'}</code></td>
                 </tr>
-            `).join('');
-        } catch (e) { console.error("Erreur pods:", e); }
+            `}).join('');
+        } catch (e) { 
+            console.error("Erreur mise à jour pods:", e); 
+        }
     }
 
-    setInterval(refreshPods, 3000); 
+    // Lancer la boucle de rafraîchissement
+    setInterval(refreshPods, 4000); 
     refreshPods();
 
-    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+    function logout() { 
+        localStorage.clear(); 
+        window.location.href = 'login.html'; 
+    }
 </script>
 </body>
 </html>
