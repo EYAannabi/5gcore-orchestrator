@@ -188,35 +188,28 @@ def get_helm_values(
 
 
 def build_helm_values(config) -> Dict[str, str]:
-    """
-    Génère la configuration Helm sans envoyer de valeurs vides (évite l'erreur de nom vide).
-    """
     op_id = config.operator_name.lower().replace(' ', '-')
     
-    # 1. On prépare les valeurs de base
     values = {
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
         "slice.type": config.slice_type.value,
-        "upf.replicas": str(config.num_upf_replicas),
-        "smf.replicas": str(config.num_smf_replicas),
-        "amf.replicas": str(config.num_amf_replicas),
         
-        # Isolation MongoDB
+        # --- ISOLATION MONGODB ---
         "mongodb.fullnameOverride": f"mongodb-{op_id}",
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
-        "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
+        # On ne définit SURTOUT PAS pvName ici pour laisser K3s choisir
         
-        # Standards
+        # --- PARAMÈTRES STANDARDS ---
         "webui.enabled": "true" if config.expose_webui else "false",
         "global.deploymentStrategy": "RollingUpdate",
         "affinity.enabled": "false"
     }
 
-    # 2. Gestion des ressources
+    # Gestion des ressources (indispensable pour ta VM de 12Go)
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
@@ -224,11 +217,8 @@ def build_helm_values(config) -> Dict[str, str]:
         values["resources.requests.cpu"] = "100m"
         values["resources.requests.memory"] = "128Mi"
     
-    # NOTE : On ne rajoute PAS pvName ou existingClaim ici. 
-    # En les omettant, Helm utilisera les valeurs par défaut du chart
-    # ou laissera Kubernetes gérer le nommage dynamique.
-
     return values
+
 def rollback_release(
     deployment_name: str,
     namespace: str,
