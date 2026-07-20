@@ -6,6 +6,7 @@ Handles dynamic configuration and lifecycle management.
 import subprocess
 import logging
 import os
+import json
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
@@ -198,7 +199,7 @@ def build_helm_values(config) -> Dict[str, str]:
         "slice.type": config.slice_type.value,
         
         # --- ISOLATION MONGODB ---
-        "mongodb.fullnameOverride": f"mongodb-{op_id}",
+        #"mongodb.fullnameOverride": f"mongodb-{op_id}",
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
         # On ne définit SURTOUT PAS pvName ici pour laisser K3s choisir
