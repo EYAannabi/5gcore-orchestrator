@@ -188,29 +188,76 @@ def get_helm_values(
 
 
 def build_helm_values(config) -> Dict[str, str]:
+    """
+    Génère la configuration Helm avec isolation totale par opérateur.
+    Cette version utilise le provisionnement dynamique de K3s pour éviter les conflits de disques.
+    """
+    # Nettoyage de l'identifiant pour la compatibilité Kubernetes
     op_id = config.operator_name.lower().replace(' ', '-')
+    
+    # --- LOGIQUE DE DIMENSIONNEMENT INTELLIGENT (NETDEVOPS) ---
+    # On ajuste automatiquement les ressources si le nombre d'abonnés est important
+    calculated_upf = config.num_upf_replicas
+    calculated_amf = config.num_amf_replicas
+    
+    if config.num_subscribers > 5000:
+        logger.info(f"Smart Sizing : Haute disponibilité activée pour {op_id} (>5000 abonnés)")
+        calculated_upf = max(calculated_upf, 2)
+        calculated_amf = max(calculated_amf, 2)
+
+    # --- CONSTRUCTION DU DICTIONNAIRE DE VALEURS ---
     values = {
+        # Identification et Traçabilité
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
-        # ... (mcc, mnc, etc.)
         
-        # --- SOLUTION FINALE ---
+        # Paramètres 5G Core
+        "global.mcc": config.mcc,
+        "global.mnc": config.mnc,
+        "slice.type": config.slice_type.value,
+        
+        # Scaling des fonctions réseau
+        "upf.replicas": str(calculated_upf),
+        "smf.replicas": str(config.num_smf_replicas),
+        "amf.replicas": str(calculated_amf),
+
+        # --- ISOLATION MULTI-OPÉRATEUR DU STOCKAGE (CRITIQUE) ---
+        # On renomme l'instance pour que le service s'appelle 'mongodb-orange' etc.
+        "mongodb.fullnameOverride": f"mongodb-{op_id}",
+        
+        # Activation du stockage dynamique K3s (remplace le PV statique supprimé)
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
         
-        # On force Helm à NE PAS utiliser le nom fixe
-        "mongodb.persistence.pvName": "", 
+        # ON FORCE L'IGNORANCE DES NOMS STATIQUES QUI BLOQUAIENT
+        # En laissant pvName vide, Kubernetes génère un ID unique automatiquement
+        "mongodb.persistence.pvName": "",
         "mongodb.persistence.existingClaim": "",
-        
-        # On renomme tout pour que ce soit unique par opérateur
-        "mongodb.fullnameOverride": f"mongodb-{op_id}",
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
         
-        # Désactiver la création de PV via le chart s'il y a une option
-        "mongodb.createPv": "false", 
+        # Sécurité supplémentaire pour désactiver toute création de PV manuel par le chart
+        "mongodb.createPv": "false",
         "db.persistence.enabled": "true",
-        "db.persistence.storageClass": "local-path"
+        "db.persistence.storageClass": "local-path",
+
+        # Paramètres d'exposition et mise à jour sans coupure
+        "webui.enabled": "true" if config.expose_webui else "false",
+        "prometheus.enabled": "true" if config.enable_prometheus else "false",
+        "monitoring.enabled": "true" if config.monitoring_enabled else "false",
+        "global.deploymentStrategy": "RollingUpdate",
     }
+    
+    # --- GESTION DES RESSOURCES CPU/RAM ---
+    if config.deployment_mode.value == "production":
+        values["resources.requests.cpu"] = "500m"
+        values["resources.requests.memory"] = "512Mi"
+        values["affinity.enabled"] = "true"
+    else:
+        values["resources.requests.cpu"] = "100m"
+        values["resources.requests.memory"] = "128Mi"
+        values["affinity.enabled"] = "false"
+    
+    logger.info(f"✅ Valeurs Helm générées avec succès pour l'opérateur : {op_id}")
     return values
 
 def rollback_release(
