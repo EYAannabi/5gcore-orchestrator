@@ -189,44 +189,46 @@ def get_helm_values(
 
 def build_helm_values(config) -> Dict[str, str]:
     """
-    Génère la configuration Helm avec isolation totale par opérateur.
-    Cette version utilise le provisionnement dynamique de K3s pour éviter les conflits de disques.
+    Génère la configuration Helm sans envoyer de valeurs vides (évite l'erreur de nom vide).
     """
-    # Nettoyage de l'identifiant pour la compatibilité Kubernetes
     op_id = config.operator_name.lower().replace(' ', '-')
     
+    # 1. On prépare les valeurs de base
     values = {
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
+        "slice.type": config.slice_type.value,
+        "upf.replicas": str(config.num_upf_replicas),
+        "smf.replicas": str(config.num_smf_replicas),
+        "amf.replicas": str(config.num_amf_replicas),
         
-        # --- ISOLATION MULTI-OPÉRATEUR ---
+        # Isolation MongoDB
         "mongodb.fullnameOverride": f"mongodb-{op_id}",
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
         "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
-
-        # ON NE PASSE PLUS pvName et existingClaim s'ils sont vides
-        # Cela évite l'erreur "resource name may not be empty"
-
+        
+        # Standards
         "webui.enabled": "true" if config.expose_webui else "false",
         "global.deploymentStrategy": "RollingUpdate",
+        "affinity.enabled": "false"
     }
-    
-    # --- GESTION DES RESSOURCES CPU/RAM ---
+
+    # 2. Gestion des ressources
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
-        values["affinity.enabled"] = "true"
     else:
         values["resources.requests.cpu"] = "100m"
         values["resources.requests.memory"] = "128Mi"
-        values["affinity.enabled"] = "false"
     
-    logger.info(f"✅ Valeurs Helm générées avec succès pour l'opérateur : {op_id}")
-    return values
+    # NOTE : On ne rajoute PAS pvName ou existingClaim ici. 
+    # En les omettant, Helm utilisera les valeurs par défaut du chart
+    # ou laissera Kubernetes gérer le nommage dynamique.
 
+    return values
 def rollback_release(
     deployment_name: str,
     namespace: str,
