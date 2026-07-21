@@ -33,11 +33,12 @@ apps_v1 = client.AppsV1Api() if KUBE_CONFIGURED else None
 
 def list_pods(namespace: str = "free5gc") -> List[Dict[str, Any]]:
     """
-    Retrieve all pods in the specified namespace.
-    
+    Retrieve all pods in the specified namespace, or across all namespaces
+    if namespace is None (used by the admin multi-operator dashboard).
+
     Args:
-        namespace: Kubernetes namespace to query
-        
+        namespace: Kubernetes namespace to query, or None for all namespaces
+
     Returns:
         List of pod information dictionaries
     """
@@ -46,22 +47,25 @@ def list_pods(namespace: str = "free5gc") -> List[Dict[str, Any]]:
             logger.warning("Kubernetes client is not configured; returning no pods")
             return []
 
-        pods = v1.list_namespaced_pod(namespace=namespace)
+        if namespace is None:
+            pods = v1.list_pod_for_all_namespaces()
+        else:
+            pods = v1.list_namespaced_pod(namespace=namespace)
+
         result = []
         for pod in pods.items:
-            # Calculate pod age
             age = _calculate_age(pod.metadata.creation_timestamp)
-            
+
             result.append({
                 "name": pod.metadata.name,
                 "status": pod.status.phase,
                 "ip": pod.status.pod_ip,
-                "namespace": namespace,
+                "namespace": pod.metadata.namespace,  # toujours le vrai namespace du pod
                 "age": age,
                 "restart_count": pod.status.container_statuses[0].restart_count if pod.status.container_statuses else 0,
                 "containers": len(pod.spec.containers) if pod.spec.containers else 0
             })
-        logger.info(f"Retrieved {len(result)} pods from namespace {namespace}")
+        logger.info(f"Retrieved {len(result)} pods from namespace {namespace or 'ALL'}")
         return result
     except ApiException as e:
         logger.error(f"Kubernetes API error listing pods: {e}")
@@ -69,7 +73,6 @@ def list_pods(namespace: str = "free5gc") -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error listing pods: {e}")
         return []
-
 
 def get_node_status() -> List[Dict[str, Any]]:
     """
