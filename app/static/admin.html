@@ -110,8 +110,13 @@
 </div>
 
 <script>
+    // 1. Configuration dynamique de l'URL Grafana
     const host = window.location.hostname;
-    const grafanaUrl = `http://${host}:30000/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&kiosk`;
+    // Ton UID exact récupéré depuis Grafana
+    const dashboardUID = "85a562078cdf77779eaa1add43ccec1e";
+    
+    // URL formatée pour l'intégration (Mode Kiosk pour cacher les menus)
+    const grafanaUrl = `http://${host}:30000/d/${dashboardUID}/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&kiosk`;
     
     document.getElementById('grafana-frame').src = grafanaUrl;
 
@@ -119,7 +124,7 @@
 
     async function fetchData() {
         try {
-            // 1. Overview
+            // 1. Overview - Stats globales du cluster
             const resOverview = await fetch('/api/admin/overview');
             const data = await resOverview.json();
             
@@ -127,30 +132,33 @@
             document.getElementById('count-nodes').innerText = data.nodes_ready;
             document.getElementById('count-pods-running').innerText = data.pods_running;
             document.getElementById('count-pods-pending').innerText = data.pods_pending;
-            document.getElementById('cluster-health').innerText = data.cluster_status;
-            document.getElementById('cluster-health').className = `stat-value ${data.cluster_status === 'Healthy' ? 'text-success' : 'text-warning'}`;
+            
+            const healthEl = document.getElementById('cluster-health');
+            healthEl.innerText = data.cluster_status;
+            healthEl.className = `stat-value ${data.cluster_status === 'Healthy' ? 'text-success' : 'text-warning'}`;
 
-            // Mise à jour graphique
-            updateChart(data.pods_running, data.pods_pending, data.pods_failed);
+            // Mise à jour du graphique circulaire (Doughnut)
+            updateChart(data.pods_running, data.pods_pending, data.pods_failed || 0);
 
-            // 2. Operators Table
+            // 2. Operators Table - Liste des réseaux déployés
             const resOps = await fetch('/api/admin/operators');
             const ops = await resOps.json();
             const tbody = document.getElementById('operators-table-body');
+            
             tbody.innerHTML = ops.map(op => `
                 <tr>
-                    <td><strong>${op.name}</strong></td>
+                    <td><img src="/static/assets/default.png" style="width:20px; margin-right:8px;"> <strong>${op.name}</strong></td>
                     <td><code>${op.namespace}</code></td>
-                    <td>${op.running_count} / ${op.pod_count}</td>
-                    <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">${op.status}</span></td>
+                    <td><span class="badge bg-secondary">${op.running_count} / ${op.pod_count} Pods</span></td>
+                    <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">● ${op.status}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-outline-info" onclick="window.open('${op.webui_url}')">WebUI</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.name}', '${op.namespace}')">🗑️</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="window.open('${op.webui_url}')">Accès WebUI</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.name}', '${op.namespace}')">Supprimer</button>
                     </td>
                 </tr>
             `).join('');
 
-        } catch (e) { console.error("Erreur fetch admin:", e); }
+        } catch (e) { console.error("Erreur de rafraîchissement des données Admin:", e); }
     }
 
     function updateChart(running, pending, failed) {
@@ -163,28 +171,42 @@
                 datasets: [{
                     data: [running, pending, failed],
                     backgroundColor: ['#3fb950', '#d29922', '#f85149'],
+                    hoverOffset: 4,
                     borderWidth: 0
                 }]
             },
-            options: { plugins: { legend: { position: 'bottom' } } }
+            options: { 
+                cutout: '70%',
+                plugins: { legend: { position: 'bottom', labels: { color: '#8b949e' } } } 
+            }
         });
     }
 
     async function deleteNetwork(name, ns) {
-        if (confirm(`Supprimer le réseau de ${name} ?`)) {
-            await fetch(`/api/core/clean?deployment_name=${name.toLowerCase()}-core&namespace=${ns}`, { method: 'DELETE' });
-            fetchData();
+        if (confirm(`⚠️ ATTENTION : Voulez-vous vraiment supprimer le réseau de ${name} ?`)) {
+            try {
+                const res = await fetch(`/api/core/clean?deployment_name=${name.toLowerCase()}-core&namespace=${ns}`, { method: 'DELETE' });
+                if (res.ok) {
+                    alert("Réseau supprimé avec succès.");
+                    fetchData();
+                }
+            } catch (e) { alert("Erreur lors de la suppression."); }
         }
     }
 
     function refreshGrafana() {
-        document.getElementById('grafana-frame').src += '';
+        const frame = document.getElementById('grafana-frame');
+        frame.src = frame.src; // Force le rechargement de l'iframe
     }
 
-    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+    function logout() { 
+        localStorage.clear(); 
+        window.location.href = 'login.html'; 
+    }
 
+    // Intervalle de mise à jour (5 secondes)
     setInterval(fetchData, 5000);
-    fetchData();
+    fetchData(); // Premier appel au chargement
 </script>
 </body>
 </html>
