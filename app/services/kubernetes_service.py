@@ -524,3 +524,80 @@ def wait_for_pods(
             return False, running_count
         
         time.sleep(5)  # Check every 5 seconds
+def get_operator_namespaces():
+    """Liste les namespaces des opérateurs (*-5g)"""
+    v1 = client.CoreV1Api()
+    namespaces = v1.list_namespace().items
+    return [ns.metadata.name for ns in namespaces if ns.metadata.name.endswith("-5g")]
+
+def get_cluster_health():
+    """Vérifie si les nodes sont Ready"""
+    v1 = client.CoreV1Api()
+    nodes = v1.list_node().items
+    ready_nodes = 0
+    for node in nodes:
+        if any(c.type == "Ready" and c.status == "True" for c in node.status.conditions):
+            ready_nodes += 1
+    
+    status = "Healthy" if ready_nodes == len(nodes) else "Warning"
+    if ready_nodes == 0: status = "Critical"
+    
+    return {"status": status, "nodes_ready": ready_nodes, "nodes_total": len(nodes)}
+
+def get_all_pods_stats():
+    """Compte les pods par statut dans TOUT le cluster"""
+    v1 = client.CoreV1Api()
+    pods = v1.list_pod_for_all_namespaces().items
+    stats = {"Running": 0, "Pending": 0, "Failed": 0}
+    for pod in pods:
+        phase = pod.status.phase
+        if phase in stats:
+            stats[phase] += 1
+    return stats
+
+def get_operator_status_detailed():
+    """Génère les données pour le tableau des opérateurs (Phase 3)"""
+    v1 = client.CoreV1Api()
+    apps_v1 = client.AppsV1Api()
+    
+    operators = get_operator_namespaces()
+    detailed_list = []
+    
+    for ns in operators:
+        pods = v1.list_namespaced_pod(ns).items
+        running_pods = [p for p in pods if p.status.phase == "Running"]
+        
+        # On détermine un statut global pour l'opérateur
+        status = "Running" if len(running_pods) == len(pods) and len(pods) > 0 else "Degraded"
+        if len(pods) == 0: status = "Stopped"
+        
+        detailed_list.append({
+            "name": ns.replace("-5g", "").upper(),
+            "namespace": ns,
+            "pod_count": len(pods),
+            "running_count": len(running_pods),
+            "status": status,
+            "webui_url": f"http://192.168.140.128:30500" # Sera dynamique plus tard
+        })
+    return detailed_list
+
+def get_cluster_resources():
+    """Récupère l'utilisation CPU/RAM (Nécessite metrics-server)"""
+    try:
+        custom_api = client.CustomObjectsApi()
+        metrics = custom_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
+        
+        # Calcul simplifié pour la démo
+        total_cpu = 0
+        total_mem = 0
+        for node in metrics['items']:
+            # Conversion brute (nanocores et kibibytes)
+            total_cpu += int(node['usage']['cpu'].replace('n', '')) / 1000000
+            total_mem += int(node['usage']['memory'].replace('Ki', '')) / 1024
+            
+        return {
+            "cpu_usage_mhz": round(total_cpu, 2),
+            "mem_usage_mb": round(total_mem, 2)
+        }
+    except:
+        return {"cpu": "N/A", "ram": "N/A"}
