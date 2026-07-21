@@ -187,30 +187,53 @@ def get_helm_values(
         logger.error(f"Error getting Helm values: {e}")
         return None
 
-
 def build_helm_values(config) -> Dict[str, str]:
+    """
+    Génère la configuration Helm avec isolation des ressources et des PORTS.
+    Cette version résout les conflits de stockage et de NodePort.
+    """
     op_id = config.operator_name.lower().replace(' ', '-')
     
+    # --- LOGIQUE D'OFFSET DES PORTS (NETDEVOPS) ---
+    # Pour éviter l'erreur 'provided port is already allocated'
+    port_offset = 0
+    if "orange" in op_id:
+        port_offset = 100
+    elif "tunisie" in op_id or "tt" in op_id:
+        port_offset = 200
+    elif "ooredoo" in op_id:
+        port_offset = 300
+
     values = {
+        # Identification
         "global.operatorName": op_id,
         "global.projectName": config.deployment_name,
         "global.mcc": config.mcc,
         "global.mnc": config.mnc,
         "slice.type": config.slice_type.value,
         
-        # --- ISOLATION MONGODB ---
-        #"mongodb.fullnameOverride": f"mongodb-{op_id}",
+        # --- RÉSOLUTION DU CONFLIT DE PORTS (NODEPORT) ---
+        # On décale les ports pour chaque opérateur
+        "webui.service.nodePort": str(30500 + port_offset),
+        "amf.service.nodePort": str(31412 + port_offset),
+        
+        # --- ISOLATION MONGODB (STOCKAGE) ---
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
-        # On ne définit SURTOUT PAS pvName ici pour laisser K3s choisir
+        "mongodb.pvc.name": f"mongodb-pvc-{op_id}",
+        # Note: on ne met pas fullnameOverride pour laisser le DNS interne 'mongodb' 
+        # fonctionner à l'intérieur du namespace de l'opérateur.
         
         # --- PARAMÈTRES STANDARDS ---
         "webui.enabled": "true" if config.expose_webui else "false",
         "global.deploymentStrategy": "RollingUpdate",
-        "affinity.enabled": "false"
+        "affinity.enabled": "false",
+        "upf.replicas": str(config.num_upf_replicas),
+        "smf.replicas": str(config.num_smf_replicas),
+        "amf.replicas": str(config.num_amf_replicas),
     }
 
-    # Gestion des ressources (indispensable pour ta VM de 12Go)
+    # Gestion des ressources pour éviter le crash de la VM 12Go
     if config.deployment_mode.value == "production":
         values["resources.requests.cpu"] = "500m"
         values["resources.requests.memory"] = "512Mi"
