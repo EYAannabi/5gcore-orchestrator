@@ -111,7 +111,9 @@
 
 <script>
     const host = window.location.hostname;
-    document.getElementById('grafana-frame').src = `http://${host}:3000/d/free5gc-dashboard?orgId=1&refresh=5s&kiosk`;
+    const grafanaUrl = `http://${host}:30000/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&kiosk`;
+    
+    document.getElementById('grafana-frame').src = grafanaUrl;
 
     let podsChart;
 
