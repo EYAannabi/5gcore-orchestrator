@@ -2,142 +2,187 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Huawei Admin - Supervision Globale 5G</title>
+    <title>HUAWEI 5G - Infrastructure Monitoring</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #0f172a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x: hidden; }
-        .topbar { background: #d71920; padding: 12px 25px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 1000; position: relative; }
-        .dashboard-container { padding: 25px; }
-        .card-stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: all 0.3s ease; height: 100%; }
-        .card-stat:hover { border-color: #d71920; transform: translateY(-2px); }
-        .stat-label { color: #94a3b8; font-size: 0.85rem; text-uppercase: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-        .stat-value { font-size: 2rem; font-weight: 700; margin: 0; }
-        .text-huawei { color: #d71920; }
-        
-        /* Iframe Styling */
-        .grafana-container { background: #1e293b; border: 2px solid #334155; border-radius: 15px; overflow: hidden; margin-top: 25px; position: relative; }
-        iframe { width: 100%; min-height: 700px; border: none; }
-        
-        .badge-status { font-size: 0.9rem; padding: 8px 12px; border-radius: 20px; }
-        .ns-tag { background: rgba(215, 25, 32, 0.1); border: 1px solid rgba(215, 25, 32, 0.3); color: #f87171; padding: 2px 10px; border-radius: 5px; margin-right: 5px; font-size: 0.8rem; }
+        body { background: #0b0f1a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .topbar { background: #d71921; padding: 15px; font-weight: bold; border-bottom: 4px solid #a01419; }
+        .sidebar { background: #161b22; min-height: 100vh; border-right: 1px solid #30363d; }
+        .card-custom { background: #1c2128; border: 1px solid #30363d; border-radius: 8px; padding: 20px; height: 100%; }
+        .stat-value { font-size: 2.5rem; font-weight: 800; color: #f85149; }
+        .stat-label { color: #8b949e; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+        .table-dark-custom { background: #1c2128; color: white; border-radius: 8px; overflow: hidden; }
+        .status-running { color: #3fb950; font-weight: bold; }
+        .status-pending { color: #d29922; font-weight: bold; }
+        .status-critical { color: #f85149; font-weight: bold; }
+        canvas { max-height: 200px; }
     </style>
 </head>
 <body>
 
-    <!-- Barre supérieure -->
-    <div class="topbar d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <span class="fs-4 me-3">🚀</span>
-            <div>
-                <div style="line-height: 1.2;">HUAWEI 5G ORCHESTRATOR</div>
-                <small style="font-size: 0.7rem; opacity: 0.8;">SUPERVISION GLOBALE MULTI-OPÉRATEUR</small>
+<div class="topbar d-flex justify-content-between align-items-center shadow">
+    <span>🛰️ HUAWEI 5G CORE ORCHESTRATOR - INFRASTRUCTURE ADMIN</span>
+    <div>
+        <span class="badge bg-dark border border-secondary me-3">K3S CLUSTER: READY</span>
+        <button onclick="logout()" class="btn btn-sm btn-outline-light">Déconnexion</button>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row mt-4">
+        <!-- Cartes Statistiques -->
+        <div class="col-md-2">
+            <div class="card-custom">
+                <div class="stat-label">Opérateurs</div>
+                <div class="stat-value" id="count-operators">0</div>
             </div>
         </div>
-        <div class="d-flex align-items-center gap-3">
-            <span id="admin-name" class="badge bg-dark">Admin</span>
-            <button onclick="logout()" class="btn btn-sm btn-outline-light px-3">Déconnexion</button>
+        <div class="col-md-2">
+            <div class="card-custom text-center">
+                <div class="stat-label">Nodes Ready</div>
+                <div class="stat-value text-success" id="count-nodes">0/0</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card-custom text-center">
+                <div class="stat-label">Pods Running</div>
+                <div class="stat-value text-info" id="count-pods-running">0</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card-custom text-center">
+                <div class="stat-label">Pods Pending</div>
+                <div class="stat-value text-warning" id="count-pods-pending">0</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-custom">
+                <div class="stat-label">Santé du Cluster</div>
+                <div class="stat-value" id="cluster-health">...</div>
+            </div>
         </div>
     </div>
 
-    <div class="dashboard-container">
-        <div class="row g-4 mb-2">
-            <!-- Statistique : Opérateurs -->
-            <div class="col-md-3">
-                <div class="card-stat">
-                    <div class="stat-label">Opérateurs Actifs</div>
-                    <h2 class="stat-value text-huawei" id="total-ns">0</h2>
-                </div>
-            </div>
-
-            <!-- Statistique : Cluster -->
-            <div class="col-md-3">
-                <div class="card-stat">
-                    <div class="stat-label">État du Cluster K3s</div>
-                    <h2 class="stat-value text-success" id="cluster-status">Connecté</h2>
-                </div>
-            </div>
-
-            <!-- Statistique : Liste des Namespaces -->
-            <div class="col-md-6">
-                <div class="card-stat">
-                    <div class="stat-label">Réseaux Détectés (Namespaces -5g)</div>
-                    <div id="ns-list" class="mt-2 d-flex flex-wrap gap-2">
-                        <span class="text-muted italic">Analyse du cluster en cours...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section Grafana -->
-        <div class="d-flex justify-content-between align-items-center mt-4">
-            <h4 class="m-0">Supervision Temps Réel (Prometheus / Grafana)</h4>
-            <div class="d-flex align-items-center gap-2">
-                <span class="spinner-grow spinner-grow-sm text-huawei"></span>
-                <span class="text-secondary" style="font-size: 0.8rem;">Live Data</span>
+    <div class="row mt-4">
+        <!-- Tableau des Opérateurs -->
+        <div class="col-md-8">
+            <div class="card-custom">
+                <h5 class="mb-4 text-primary">Gestion des Réseaux Opérateurs</h5>
+                <table class="table table-dark table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Opérateur</th>
+                            <th>Namespace</th>
+                            <th>Pods</th>
+                            <th>État</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="operators-table-body">
+                        <!-- Rempli par JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
         
-        <div class="grafana-container shadow-lg">
-            <!-- NOTE : Remplace 192.168.140.128 par l'IP de ta VM si elle change -->
-            <iframe id="grafana-frame" src="http://192.168.140.128:3000/d/free5gc-dashboard?orgId=1&refresh=5s&kiosk"></iframe>
+        <!-- Graphiques rapides -->
+        <div class="col-md-4">
+            <div class="card-custom">
+                <h5 class="mb-3">Distribution des Pods</h5>
+                <canvas id="podsChart"></canvas>
+            </div>
         </div>
     </div>
 
-    <script>
-        // 1. Vérification de sécurité au chargement
-        const role = localStorage.getItem('user_role');
-        const username = localStorage.getItem('username');
+    <!-- Iframe Grafana -->
+    <div class="row mt-4 mb-5">
+        <div class="col-12">
+            <div class="card-custom p-0">
+                <div class="p-3 border-bottom border-secondary d-flex justify-content-between">
+                    <h5>Supervision Temps Réel (Prometheus / Grafana)</h5>
+                    <button onclick="refreshGrafana()" class="btn btn-xs btn-outline-primary">Rafraîchir Frame</button>
+                </div>
+                <iframe id="grafana-frame" src="" width="100%" height="600" style="border:none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
 
-        if (!username || role !== 'admin') {
-            console.error("Accès refusé : Rôle admin requis.");
-            window.location.href = 'login.html';
+<script>
+    const host = window.location.hostname;
+    document.getElementById('grafana-frame').src = `http://${host}:3000/d/free5gc-dashboard?orgId=1&refresh=5s&kiosk`;
+
+    let podsChart;
+
+    async function fetchData() {
+        try {
+            // 1. Overview
+            const resOverview = await fetch('/api/admin/overview');
+            const data = await resOverview.json();
+            
+            document.getElementById('count-operators').innerText = data.total_operators;
+            document.getElementById('count-nodes').innerText = data.nodes_ready;
+            document.getElementById('count-pods-running').innerText = data.pods_running;
+            document.getElementById('count-pods-pending').innerText = data.pods_pending;
+            document.getElementById('cluster-health').innerText = data.cluster_status;
+            document.getElementById('cluster-health').className = `stat-value ${data.cluster_status === 'Healthy' ? 'text-success' : 'text-warning'}`;
+
+            // Mise à jour graphique
+            updateChart(data.pods_running, data.pods_pending, data.pods_failed);
+
+            // 2. Operators Table
+            const resOps = await fetch('/api/admin/operators');
+            const ops = await resOps.json();
+            const tbody = document.getElementById('operators-table-body');
+            tbody.innerHTML = ops.map(op => `
+                <tr>
+                    <td><strong>${op.name}</strong></td>
+                    <td><code>${op.namespace}</code></td>
+                    <td>${op.running_count} / ${op.pod_count}</td>
+                    <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">${op.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" onclick="window.open('${op.webui_url}')">WebUI</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.name}', '${op.namespace}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (e) { console.error("Erreur fetch admin:", e); }
+    }
+
+    function updateChart(running, pending, failed) {
+        const ctx = document.getElementById('podsChart').getContext('2d');
+        if (podsChart) { podsChart.destroy(); }
+        podsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Running', 'Pending', 'Failed'],
+                datasets: [{
+                    data: [running, pending, failed],
+                    backgroundColor: ['#3fb950', '#d29922', '#f85149'],
+                    borderWidth: 0
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    async function deleteNetwork(name, ns) {
+        if (confirm(`Supprimer le réseau de ${name} ?`)) {
+            await fetch(`/api/core/clean?deployment_name=${name.toLowerCase()}-core&namespace=${ns}`, { method: 'DELETE' });
+            fetchData();
         }
+    }
 
-        document.getElementById('admin-name').innerText = "Identifié : " + username;
+    function refreshGrafana() {
+        document.getElementById('grafana-frame').src += '';
+    }
 
-        // 2. Fonction pour récupérer les statistiques réelles depuis l'API
-        async function refreshStats() {
-            try {
-                // Cette route doit exister dans app/routes/pods.py (@router.get("/stats/global"))
-                const res = await fetch('/api/status/stats/global');
-                if (!res.ok) throw new Error("Erreur API Stats");
-                
-                const data = await res.json();
-                
-                // Mise à jour du compteur
-                document.getElementById('total-ns').innerText = data.total_operators;
+    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
 
-                // Mise à jour de la liste visuelle des namespaces
-                const listContainer = document.getElementById('ns-list');
-                if (data.namespaces && data.namespaces.length > 0) {
-                    listContainer.innerHTML = data.namespaces
-                        .map(ns => `<span class="ns-tag">${ns}</span>`)
-                        .join('');
-                } else {
-                    listContainer.innerHTML = '<span class="text-muted italic">Aucun réseau opérateur déployé.</span>';
-                }
-
-                // Vérification santé cluster
-                document.getElementById('cluster-status').innerText = "Healthy";
-                document.getElementById('cluster-status').className = "stat-value text-success";
-
-            } catch (e) {
-                console.error("Erreur refreshStats:", e);
-                document.getElementById('cluster-status').innerText = "Erreur API";
-                document.getElementById('cluster-status').className = "stat-value text-danger";
-            }
-        }
-
-        // 3. Boucle de mise à jour automatique (toutes les 5 secondes)
-        setInterval(refreshStats, 5000);
-        refreshStats(); // Appel initial immédiat
-
-        // 4. Fonction de déconnexion
-        function logout() { 
-            localStorage.clear(); 
-            window.location.href = 'login.html'; 
-        }
-    </script>
+    setInterval(fetchData, 5000);
+    fetchData();
+</script>
 </body>
 </html>

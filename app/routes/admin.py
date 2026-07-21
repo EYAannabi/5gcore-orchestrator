@@ -28,12 +28,12 @@ async def get_overview():
 
 @router.get("/operators")
 async def get_operators_list():
-    """Liste détaillée des opérateurs pour le tableau de la Phase 3"""
+    """Liste détaillée des opérateurs pour le tableau"""
     try:
+        from app.services import kubernetes_service as k8s
         return k8s.get_operator_status_detailed()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/resources")
 async def get_resources():
     """Métriques CPU/RAM réelles du cluster"""
