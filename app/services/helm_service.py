@@ -205,8 +205,8 @@ def build_helm_values(config) -> Dict[str, str]:
         "global.mnc": config.mnc,
         "slice.type": config.slice_type.value,
 
-        "webui.service.nodePort": str(30500 + port_offset),          # P majuscule
-        "global.amf.service.ngap.nodeport": str(31412 + port_offset), # minuscule
+        "free5gc-webui.webui.service.nodePort": str(30500 + port_offset),
+        "global.amf.service.ngap.nodeport": str(31412 + port_offset),
 
         "mongodb.persistence.enabled": "true",
         "mongodb.persistence.storageClass": "local-path",
@@ -227,7 +227,6 @@ def build_helm_values(config) -> Dict[str, str]:
         values["resources.requests.memory"] = "128Mi"
 
     return values
-
 def rollback_release(
     deployment_name: str,
     namespace: str,
