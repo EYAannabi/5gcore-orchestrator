@@ -285,3 +285,16 @@ def _format_helm_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+def deploy_ueransim(site_name, operator_ns):
+    # On construit le nom complet (FQDN) que Kubernetes comprendra à coup sûr
+    # Format: nom-du-service.namespace.svc.cluster.local
+    amf_fqdn = f"{site_name}-core-free5gc-amf-amf-n2.{operator_ns}.svc.cluster.local"
+    
+    cmd = [
+        "helm", "install", "ueransim", "./ueransim/",
+        "--namespace", operator_ns,
+        "--set", f"amf.n2if.hostname={amf_fqdn}",
+        "--set", f"global.n2network.masterIf=ens33",
+        "--set", f"global.n3network.masterIf=ens33"
+    ]
+    # ... exécution de la commande
