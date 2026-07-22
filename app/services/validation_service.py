@@ -282,6 +282,43 @@ async def validate_pdu_session(
             error_message=str(e)
         )
     
+def _parse_ping_stats(ping_output: str) -> dict:
+    """
+    Extrait les statistiques structurées d'une sortie `ping` Linux standard.
+    Exemple de ligne source :
+    "3 packets transmitted, 3 received, 0% packet loss, time 2002ms"
+    "rtt min/avg/max/mdev = 92.407/113.136/134.333/17.119 ms"
+    """
+    stats = {
+        "packets_transmitted": None,
+        "packets_received": None,
+        "packet_loss_percent": None,
+        "rtt_min_ms": None,
+        "rtt_avg_ms": None,
+        "rtt_max_ms": None,
+    }
+    for line in ping_output.splitlines():
+        line = line.strip()
+        if "packet loss" in line:
+            try:
+                parts = line.split(",")
+                stats["packets_transmitted"] = int(parts[0].strip().split()[0])
+                stats["packets_received"] = int(parts[1].strip().split()[0])
+                stats["packet_loss_percent"] = float(parts[2].strip().split("%")[0])
+            except (ValueError, IndexError):
+                pass
+        if line.startswith("rtt "):
+            try:
+                values = line.split("=")[1].strip().split(" ")[0]
+                rtt_min, rtt_avg, rtt_max, _ = values.split("/")
+                stats["rtt_min_ms"] = float(rtt_min)
+                stats["rtt_avg_ms"] = float(rtt_avg)
+                stats["rtt_max_ms"] = float(rtt_max)
+            except (ValueError, IndexError):
+                pass
+    return stats
+
+
 async def validate_connectivity(
     namespace: str = "free5gc",
     deployment_name: str = "free5gc-helm",
@@ -308,6 +345,8 @@ async def validate_connectivity(
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         ping_success = result.returncode == 0 and "0% packet loss" in result.stdout
 
+        ping_stats = _parse_ping_stats(result.stdout)
+
         duration = (datetime.utcnow() - start_time).total_seconds()
         status = TestStatus.PASSED if ping_success else TestStatus.FAILED
 
@@ -316,7 +355,11 @@ async def validate_connectivity(
             test_type=ValidationTestType.CONNECTIVITY,
             status=status,
             duration_seconds=duration,
-            details={"ping_output": result.stdout[-300:], "test_host": test_host},
+            details={
+                "test_host": test_host,
+                "ping_output": result.stdout[-300:],
+                **ping_stats,
+            },
             checked_pods=[ue_pod["name"]],
             error_message=None if ping_success else "Ping failed or interface unreachable",
         )

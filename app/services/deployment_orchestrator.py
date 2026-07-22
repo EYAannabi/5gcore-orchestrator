@@ -163,6 +163,7 @@ async def test_network(
                 "name": t.test_name,
                 "passed": t.status == TestStatus.PASSED,
                 "error": t.error_message,
+                "data": t.details,
             }
             for t in report.tests
         ],
