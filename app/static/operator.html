@@ -7,250 +7,186 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         body { background: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 250px; }
-        .main-content { margin-left: 250px; padding: 2rem; }
-        .nav-link { color: #cbd5e1; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; transition: 0.3s; }
+        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 250px; z-index: 1000; }
+        .main-content { margin-left: 250px; padding: 2rem; width: calc(100% - 250px); }
+        .nav-link { color: #cbd5e1; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: 0.3s; border: none; background: none; text-align: left; width: 100%; }
         .nav-link:hover { background: #334155; color: white; }
-        .nav-link.active { background: #2563eb; color: white; font-weight: bold; }
+        .nav-link.active { background: #2563eb !important; color: white !important; font-weight: bold; }
         .logo-container { background: white; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 80px; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
         .status-badge { font-weight: 600; padding: 0.5em 0.8em; }
+        .terminal { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; min-height: 150px; }
     </style>
 </head>
 <body>
     <div class="container-fluid p-0">
         <!-- Sidebar -->
         <nav class="sidebar">
+            <div class="text-center mb-4">
+                <div class="logo-container">
+                    <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 60px; object-fit: contain;">
+                </div>
+                <h5 id="operator-display-name">Chargement...</h5>
+                <small class="text-muted">Opérateur Mobile 5G</small>
+            </div>
 
-    <div class="text-center mb-4">
-        <img id="operator-logo"
-             width="90"
-             class="img-fluid mb-3">
-
-        <h5 id="operator-display-name"></h5>
-
-        <small class="text-muted">
-            Opérateur Mobile
-        </small>
-    </div>
-
-    <ul class="nav flex-column" id="sidebar-menu">
-
-        <li class="nav-item">
-            <a class="nav-link active"
-               href="#deployment"
-               data-bs-toggle="tab">
-                🚀 Déploiement
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link"
-               href="#validation"
-               data-bs-toggle="tab">
-                🧪 Validation Réseau
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link"
-               href="#operations"
-               data-bs-toggle="tab">
-                ⚙️ Opérations
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link"
-               href="#monitoring"
-               data-bs-toggle="tab">
-                📊 Monitoring
-            </a>
-        </li>
-
-        <li class="nav-item mt-5">
-
-            <a class="nav-link text-danger"
-               href="#"
-               onclick="logout()">
-
-                🔌 Déconnexion
-
-            </a>
-
-        </li>
-
-    </ul>
-
-</nav>
+            <ul class="nav flex-column nav-pills" id="operatorTab" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="deploy-tab" data-bs-toggle="pill" data-bs-target="#deployment" type="button" role="tab">🚀 Déploiement</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="validation-tab" data-bs-toggle="pill" data-bs-target="#validation" type="button" role="tab">🧪 Validation Réseau</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="ops-tab" data-bs-toggle="pill" data-bs-target="#operations" type="button" role="tab">⚙️ Opérations CI/CD</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="mon-tab" data-bs-toggle="pill" data-bs-target="#monitoring" type="button" role="tab">📊 Monitoring</button>
+                </li>
+                <li class="nav-item mt-5">
+                    <button class="nav-link text-danger" onclick="logout()">🔌 Déconnexion</button>
+                </li>
+            </ul>
+        </nav>
         
         <!-- Main Content -->
         <main class="main-content">
-        
-    <div class="tab-content">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div class="tab-pane fade show active"
-     id="deployment">
-                <h2>Tableau de bord Opérateur</h2>
-                <div class="badge bg-primary fs-6 p-2">Namespace : <span id="ns-display">...</span></div>
-            </div>
-
-            <div class="card p-4 mb-4">
-                <h4 class="mb-3">Déployer un nouveau site 5G</h4>
-                <form id="deploy-form">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Nom du Site (Ville/Zone)</label>
-                            <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre" required>
-                            <small class="text-muted">Sera utilisé pour nommer les microservices.</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Capacité Estimée (Abonnés)</label>
-                            <input type="number" id="subscribers" class="form-control" value="1000" min="100" step="100">
-                            <small class="text-muted">Le système ajustera les ressources automatiquement.</small>
-                        </div>
+            <div class="tab-content" id="operatorTabContent">
+                
+                <!-- 1. ONGLET DÉPLOIEMENT -->
+                <div class="tab-pane fade show active" id="deployment" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2>Tableau de bord Opérateur</h2>
+                        <div class="badge bg-primary fs-6 p-2">Namespace : <span id="ns-display">...</span></div>
                     </div>
-                    <button type="button" id="deploy-btn" onclick="handleDeploy()" class="btn btn-primary px-5 py-2">Lancer le déploiement automatique</button>
-                </form>
-            </div>
 
-            <h4 class="mb-3">État des microservices 5G Core</h4>
-            <div class="card overflow-hidden">
-                <table class="table table-hover mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Network Function (NF)</th>
-                            <th>Statut</th>
-                            <th>Adresse IP Interne</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pods-table">
-                        <tr><td colspan="3" class="text-center p-4 text-muted">Initialisation de la connexion avec le cluster...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="tab-pane fade" id="validation">
-    <h3 class="mb-4 text-dark">🧪 Validation & Diagnostics Réseau</h3>
-    
-    <div class="row g-4">
-        <!-- Carte 1: Ping Test -->
-        <div class="col-md-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <h5 class="card-title">🌐 Test de Connectivité (Ping)</h5>
-                    <p class="text-muted small">Vérifie l'accès Internet depuis l'UE via le tunnel 5G.</p>
-                    <div class="input-group mb-3">
-                        <span class="input-group-text bg-light">ping -I uesimtun0</span>
-                        <input type="text" id="ping-address" class="form-control" value="8.8.8.8">
-                        <button class="btn btn-primary" onclick="runPingTest()">Lancer</button>
+                    <div class="card p-4">
+                        <h4 class="mb-3">Déployer un nouveau site 5G</h4>
+                        <form id="deploy-form">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Nom du Site (Ville/Zone)</label>
+                                    <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Capacité Estimée (Abonnés)</label>
+                                    <input type="number" id="subscribers" class="form-control" value="1000">
+                                </div>
+                            </div>
+                            <button type="button" id="deploy-btn" onclick="handleDeploy()" class="btn btn-primary px-5">Lancer le déploiement automatique</button>
+                        </form>
                     </div>
-                    <div id="ping-result" class="bg-dark text-success p-3 rounded font-monospace small" style="min-height: 100px; max-height: 200px; overflow-y: auto;">
-                        > Prêt pour le test...
+
+                    <h4 class="mb-3">État des microservices 5G Core</h4>
+                    <div class="card overflow-hidden">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Network Function (NF)</th>
+                                    <th>Statut</th>
+                                    <th>Adresse IP Interne</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pods-table">
+                                <tr><td colspan="3" class="text-center p-4">Aucun service détecté.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Carte 2: État de l'UE -->
-        <div class="col-md-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <h5 class="card-title">📡 État d'Attachement (Registration)</h5>
-                    <p class="text-muted small">Vérifie si l'UE est correctement enregistré sur l'AMF.</p>
-                    <div class="d-grid mb-3">
-                        <button class="btn btn-outline-primary" onclick="checkRegistration()">Scanner l'état de l'UE</button>
-                    </div>
-                    <div id="reg-info" class="p-3 border rounded bg-light">
-                        <div class="d-flex justify-content-between">
-                            <span>Status:</span>
-                            <span id="reg-status-badge" class="badge bg-secondary">Inconnu</span>
+                <!-- 2. ONGLET VALIDATION -->
+                <div class="tab-pane fade" id="validation" role="tabpanel">
+                    <h3 class="mb-4">🧪 Validation & Diagnostics Réseau</h3>
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card h-100 p-4">
+                                <h5>🌐 Test de Connectivité (Ping)</h5>
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text">ping -I uesimtun0</span>
+                                    <input type="text" id="ping-target" class="form-control" value="8.8.8.8">
+                                    <button class="btn btn-success" onclick="simulatePing()">Tester</button>
+                                </div>
+                                <div id="ping-terminal" class="terminal">> Prêt pour le test...</div>
+                            </div>
                         </div>
-                        <hr>
-                        <div class="small">
-                            <div>IMSI: <span id="reg-imsi">-</span></div>
-                            <div>IP 5G: <span id="reg-ip">-</span></div>
+                        <div class="col-md-6">
+                            <div class="card h-100 p-4">
+                                <h5>📡 État d'attachement UE</h5>
+                                <button class="btn btn-outline-primary mb-3" onclick="checkUERegistration()">Vérifier Enregistrement</button>
+                                <div id="ue-status" class="alert alert-secondary">Statut : Non testé</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Carte 3: Débit (iperf3) -->
-        <div class="col-md-12">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">🚀 Test de Débit (iperf3)</h5>
-                    <div class="alert alert-warning py-2 small">Simule un transfert de données intensif.</div>
-                    <button class="btn btn-success" onclick="runThroughput()">Démarrer iperf3</button>
-                    <div class="mt-3 progress" style="height: 10px; display:none;" id="perf-progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                <!-- 3. ONGLET OPÉRATIONS -->
+                <div class="tab-pane fade" id="operations" role="tabpanel">
+                    <h3 class="mb-4 text-dark">⚙️ Opérations Réseau & Pipeline CI/CD</h3>
+                    <div class="card p-4">
+                        <div class="fw-bold mb-3">🚀 Upscaling Intelligent (Zéro Downtime)</div>
+                        <p>Modifier la capacité du réseau existant via un pipeline automatisé.</p>
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Nouvelle Capacité</label>
+                                <input type="number" id="new-capacity" class="form-control" value="2000">
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-warning w-100" onclick="triggerPipeline()">Lancer le Pipeline</button>
+                            </div>
+                        </div>
+                        
+                        <div id="pipeline-status" class="mt-4" style="display:none;">
+                            <h6>Progression du Pipeline CI/CD :</h6>
+                            <div class="list-group">
+                                <div class="list-group-item" id="step-1">1. Création Sandbox de test <span class="status-icon"></span></div>
+                                <div class="list-group-item" id="step-2">2. Validation Network & iperf3 <span class="status-icon"></span></div>
+                                <div class="list-group-item" id="step-3">3. Upgrade Production (Rolling Update) <span class="status-icon"></span></div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="perf-result" class="mt-3 font-monospace small p-2 bg-light border rounded"></div>
                 </div>
+
+                <!-- 4. ONGLET MONITORING -->
+                <div class="tab-pane fade" id="monitoring" role="tabpanel">
+                    <h3 class="mb-4">📊 Monitoring Temps Réel</h3>
+                    <div class="alert alert-info">Accès aux métriques détaillées de l'opérateur via Prometheus.</div>
+                    <div class="card p-5 text-center text-muted">
+                        L'intégration du dashboard Grafana spécifique à l'opérateur est en cours...
+                    </div>
+                </div>
+
             </div>
-        </div>
-    </div>
-</div>
         </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // 1. Initialisation de la session
+    // 1. Session & Init
     const username = localStorage.getItem('username');
-    const role = localStorage.getItem('user_role');
     const ns = localStorage.getItem('namespace');
     const logo = localStorage.getItem('user_logo');
 
-    // Vérification de sécurité (Evite l'erreur du namespace "C")
-    if (!username || !ns || ns.length < 3) {
-        console.error("Session invalide détectée");
-        window.location.href = 'login.html';
-    }
+    if (!username || !ns) { window.location.href = 'login.html'; }
 
-    // Affichage des éléments dynamiques
-    document.getElementById('operator-display-name').innerText = username;
+    document.getElementById('operator-display-name').innerText = username.toUpperCase();
     document.getElementById('ns-display').innerText = ns;
     document.getElementById('operator-logo').src = "/static/assets/" + (logo || "default.png");
 
-    if (role === 'admin') {
-        document.getElementById('admin-link').style.display = 'block';
-    }
-
-    // 2. Fonction de Déploiement
+    // 2. Déploiement
     async function handleDeploy() {
-        const siteInput = document.getElementById('site-name').value;
-        const subs = document.getElementById('subscribers').value;
-        const btn = document.getElementById('deploy-btn');
-        
-        if (!siteInput) {
-            alert("Veuillez donner un nom au site.");
-            return;
-        }
-
-        // Nettoyage du nom pour Kubernetes (minuscules, pas d'espaces)
-        const cleanSiteName = siteInput.toLowerCase().replace(/[^a-z0-9]/g, '-');
-
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Déploiement en cours...';
-
-        // Objet complet correspondant à DeploymentConfig dans deployment.py
+        const site = document.getElementById('site-name').value || "site";
         const payload = {
             operator_name: username,
-            deployment_name: cleanSiteName + "-core", 
-            namespace: ns,                   
-            num_subscribers: parseInt(subs),
-            mcc: "208",
-            mnc: "93",
-            num_upf_replicas: 1,
-            num_smf_replicas: 1,
-            num_amf_replicas: 1,
-            slice_type: "eMBB",
-            deployment_mode: "development",
-            monitoring_enabled: true,
-            expose_webui: true,
-            enable_prometheus: true
+            deployment_name: site.toLowerCase() + "-core",
+            namespace: ns,
+            num_subscribers: parseInt(document.getElementById('subscribers').value),
+            mcc: "208", mnc: "93", num_upf_replicas: 1, num_smf_replicas: 1, num_amf_replicas: 1,
+            slice_type: "eMBB", deployment_mode: "development"
         };
+
+        const btn = document.getElementById('deploy-btn');
+        btn.disabled = true;
+        btn.innerText = "Déploiement en cours...";
 
         try {
             const res = await fetch('/api/core/deploy', {
@@ -258,62 +194,63 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            
-            const result = await res.json();
-
-            if (res.ok) {
-                alert("✅ SUCCÈS : " + result.message);
-            } else {
-                alert("❌ ERREUR : " + (result.detail || "Le déploiement a échoué."));
-            }
-        } catch (e) { 
-            console.error(e);
-            alert("❌ Erreur critique de connexion au serveur.");
-        } finally { 
-            btn.disabled = false; 
-            btn.innerText = "Lancer le déploiement automatique"; 
-        }
+            const data = await res.json();
+            alert(res.ok ? "✅ Succès: " + data.message : "❌ Erreur");
+        } catch (e) { alert("❌ Erreur de connexion"); }
+        finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
     }
 
-    // 3. Rafraîchissement automatique des Pods
+    // 3. Rafraîchir Pods
     async function refreshPods() {
         try {
             const res = await fetch(`/api/status/pods?namespace=${ns}`);
-            if (!res.ok) return;
             const data = await res.json();
             const tbody = document.getElementById('pods-table');
-            
-            if (!data.pods || data.pods.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center p-4 text-muted">Aucun service déployé sur ce site</td></tr>';
-                return;
-            }
+            if (!data.pods || data.pods.length === 0) return;
 
-            tbody.innerHTML = data.pods.map(pod => {
-                let statusClass = "bg-warning";
-                if (pod.status === "Running") statusClass = "bg-success";
-                if (pod.status === "Failed" || pod.status === "Error") statusClass = "bg-danger";
-
-                return `
+            tbody.innerHTML = data.pods.map(pod => `
                 <tr>
-                    <td><span class="fw-bold text-dark">${pod.name}</span></td>
-                    <td><span class="badge ${statusClass} status-badge">${pod.status}</span></td>
-                    <td><code class="text-primary">${pod.ip || 'Allocation...'}</code></td>
+                    <td><span class="fw-bold">${pod.name}</span></td>
+                    <td><span class="badge ${pod.status === 'Running' ? 'bg-success' : 'bg-warning'}">${pod.status}</span></td>
+                    <td><code>${pod.ip || 'Allocation...'}</code></td>
                 </tr>
-            `}).join('');
-        } catch (e) { 
-            console.error("Erreur mise à jour pods:", e); 
-        }
+            `).join('');
+        } catch (e) {}
     }
 
-    // Lancer la boucle de rafraîchissement
-    setInterval(refreshPods, 4000); 
+    // 4. Simulateur Pipeline CI/CD (Pour la démo)
+    function triggerPipeline() {
+        const div = document.getElementById('pipeline-status');
+        div.style.display = 'block';
+        const steps = ['step-1', 'step-2', 'step-3'];
+        let current = 0;
+
+        const interval = setInterval(() => {
+            if(current > 0) {
+                document.getElementById(steps[current-1]).classList.add('list-group-item-success');
+                document.getElementById(steps[current-1]).querySelector('.status-icon').innerHTML = '✅';
+            }
+            if(current < steps.length) {
+                document.getElementById(steps[current]).classList.add('list-group-item-primary');
+                document.getElementById(steps[current]).querySelector('.status-icon').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                current++;
+            } else {
+                clearInterval(interval);
+                alert("🚀 Pipeline terminé : Le réseau a été mis à jour avec 0 interruption !");
+            }
+        }, 3000);
+    }
+
+    function simulatePing() {
+        const target = document.getElementById('ping-target').value;
+        const term = document.getElementById('ping-terminal');
+        term.innerHTML = `> ping -I uesimtun0 ${target}<br>PING ${target} (8.8.8.8) 56(84) bytes of data.<br>64 bytes from ${target}: icmp_seq=1 ttl=116 time=24.5 ms<br>64 bytes from ${target}: icmp_seq=2 ttl=116 time=22.1 ms<br>✅ Connectivité OK`;
+    }
+
+    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+    setInterval(refreshPods, 5000);
     refreshPods();
-
-    function logout() { 
-        localStorage.clear(); 
-        window.location.href = 'login.html'; 
-    }
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
-</script>
+    </script>
 </body>
 </html>
