@@ -130,69 +130,67 @@
                 </table>
             </div>
         </div>
-        <div class="tab-pane fade"
-     id="validation">
+        <div class="tab-pane fade" id="validation">
+    <h3 class="mb-4 text-dark">🧪 Validation & Diagnostics Réseau</h3>
+    
+    <div class="row g-4">
+        <!-- Carte 1: Ping Test -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title">🌐 Test de Connectivité (Ping)</h5>
+                    <p class="text-muted small">Vérifie l'accès Internet depuis l'UE via le tunnel 5G.</p>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-light">ping -I uesimtun0</span>
+                        <input type="text" id="ping-address" class="form-control" value="8.8.8.8">
+                        <button class="btn btn-primary" onclick="runPingTest()">Lancer</button>
+                    </div>
+                    <div id="ping-result" class="bg-dark text-success p-3 rounded font-monospace small" style="min-height: 100px; max-height: 200px; overflow-y: auto;">
+                        > Prêt pour le test...
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <h3 class="mb-4">
-        Validation Réseau
-    </h3>
+        <!-- Carte 2: État de l'UE -->
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title">📡 État d'Attachement (Registration)</h5>
+                    <p class="text-muted small">Vérifie si l'UE est correctement enregistré sur l'AMF.</p>
+                    <div class="d-grid mb-3">
+                        <button class="btn btn-outline-primary" onclick="checkRegistration()">Scanner l'état de l'UE</button>
+                    </div>
+                    <div id="reg-info" class="p-3 border rounded bg-light">
+                        <div class="d-flex justify-content-between">
+                            <span>Status:</span>
+                            <span id="reg-status-badge" class="badge bg-secondary">Inconnu</span>
+                        </div>
+                        <hr>
+                        <div class="small">
+                            <div>IMSI: <span id="reg-imsi">-</span></div>
+                            <div>IP 5G: <span id="reg-ip">-</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="alert alert-info">
-
-        Cette section permettra :
-
-        <ul>
-
-            <li>Ping UE</li>
-
-            <li>DNS Test</li>
-
-            <li>HTTP Test</li>
-
-            <li>iperf3</li>
-
-            <li>Logs</li>
-
-        </ul>
-
+        <!-- Carte 3: Débit (iperf3) -->
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">🚀 Test de Débit (iperf3)</h5>
+                    <div class="alert alert-warning py-2 small">Simule un transfert de données intensif.</div>
+                    <button class="btn btn-success" onclick="runThroughput()">Démarrer iperf3</button>
+                    <div class="mt-3 progress" style="height: 10px; display:none;" id="perf-progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <div id="perf-result" class="mt-3 font-monospace small p-2 bg-light border rounded"></div>
+                </div>
+            </div>
+        </div>
     </div>
-
-</div>
-
-<div class="tab-pane fade"
-     id="operations">
-
-    <h3 class="mb-4">
-
-        Opérations Réseau
-
-    </h3>
-
-    <div class="alert alert-warning">
-
-        Gestion des Network Functions
-
-    </div>
-
-</div>
-
-<div class="tab-pane fade"
-     id="monitoring">
-
-    <h3 class="mb-4">
-
-        Monitoring
-
-    </h3>
-
-    <div class="alert alert-success">
-
-        Prometheus / Grafana
-
-    </div>
-
-</div>
-
 </div>
         </main>
     </div>
@@ -315,6 +313,7 @@
         localStorage.clear(); 
         window.location.href = 'login.html'; 
     }
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
 </script>
 </body>
 </html>
