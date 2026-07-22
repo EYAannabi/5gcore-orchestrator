@@ -241,11 +241,63 @@
         }, 3000);
     }
 
-    function simulatePing() {
-        const target = document.getElementById('ping-target').value;
-        const term = document.getElementById('ping-terminal');
-        term.innerHTML = `> ping -I uesimtun0 ${target}<br>PING ${target} (8.8.8.8) 56(84) bytes of data.<br>64 bytes from ${target}: icmp_seq=1 ttl=116 time=24.5 ms<br>64 bytes from ${target}: icmp_seq=2 ttl=116 time=22.1 ms<br>✅ Connectivité OK`;
+    // Fonction pour le Ping Réel
+async function runPingTest() {
+    const target = document.getElementById('ping-target').value;
+    const term = document.getElementById('ping-terminal');
+    term.innerHTML = "⏳ Connexion au pod UE... Lancement du ping sur l'interface uesimtun0...";
+    
+    try {
+        // 1. On cherche d'abord le nom exact du pod UE dans le namespace
+        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+        const podsData = await podsRes.json();
+        const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
+
+        if (!uePod) {
+            term.innerHTML = "<span class='text-danger'>❌ Erreur : Pod UERANSIM-UE introuvable. Vérifiez le déploiement.</span>";
+            return;
+        }
+
+        // 2. On appelle notre API de ping
+        const res = await fetch(`/api/operator/network/ping?pod_name=${uePod.name}&namespace=${ns}&target=${target}`);
+        const data = await res.json();
+        
+        if (data.status === "success") {
+            term.innerHTML = `<span class='text-info'>> kubectl exec ${uePod.name} -- ping -I uesimtun0 ${target}</span>\n\n` + 
+                             data.stdout + 
+                             "\n\n<span class='text-success'>✅ CONNECTIVITÉ 5G VALIDÉE</span>";
+        } else {
+            term.innerHTML = "<span class='text-danger'>❌ ÉCHEC DU TEST :\n</span>" + (data.stderr || data.message);
+        }
+    } catch (e) {
+        term.innerHTML = "<span class='text-danger'>❌ Erreur de communication avec le backend.</span>";
     }
+}
+
+// Fonction pour l'enregistrement UE
+async function checkRegistration() {
+    const badge = document.getElementById('ue-status');
+    badge.innerHTML = "⏳ Vérification...";
+    
+    try {
+        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+        const podsData = await podsRes.json();
+        const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
+
+        if (!uePod) { badge.innerHTML = "Pod non trouvé"; return; }
+
+        const res = await fetch(`/api/operator/network/ue-status?pod_name=${uePod.name}&namespace=${ns}`);
+        const data = await res.json();
+        
+        if (data.registered) {
+            badge.className = "alert alert-success";
+            badge.innerHTML = "✅ UE Enregistré (IMSI actif sur le cœur 5G)";
+        } else {
+            badge.className = "alert alert-danger";
+            badge.innerHTML = "❌ UE non attaché. Vérifiez les logs AMF.";
+        }
+    } catch (e) { badge.innerHTML = "Erreur backend"; }
+}
 
     function logout() { localStorage.clear(); window.location.href = 'login.html'; }
 
