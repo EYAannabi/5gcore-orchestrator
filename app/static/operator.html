@@ -21,21 +21,76 @@
     <div class="container-fluid p-0">
         <!-- Sidebar -->
         <nav class="sidebar">
-            <div class="logo-container">
-                <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 60px; object-fit: contain;">
-            </div>
-            <h5 id="operator-display-name" class="text-center text-uppercase mb-4" style="letter-spacing: 1px; color: #94a3b8;">Chargement...</h5>
-            
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link active" href="#">🚀 Déploiement</a></li>
-                <li class="nav-item"><a class="nav-link" href="/static/admin.html" id="admin-link" style="display:none;">🛠 Administration</a></li>
-                <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" onclick="logout()">🔌 Déconnexion</a></li>
-            </ul>
-        </nav>
+
+    <div class="text-center mb-4">
+        <img id="operator-logo"
+             width="90"
+             class="img-fluid mb-3">
+
+        <h5 id="operator-display-name"></h5>
+
+        <small class="text-muted">
+            Opérateur Mobile
+        </small>
+    </div>
+
+    <ul class="nav flex-column" id="sidebar-menu">
+
+        <li class="nav-item">
+            <a class="nav-link active"
+               href="#deployment"
+               data-bs-toggle="tab">
+                🚀 Déploiement
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link"
+               href="#validation"
+               data-bs-toggle="tab">
+                🧪 Validation Réseau
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link"
+               href="#operations"
+               data-bs-toggle="tab">
+                ⚙️ Opérations
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link"
+               href="#monitoring"
+               data-bs-toggle="tab">
+                📊 Monitoring
+            </a>
+        </li>
+
+        <li class="nav-item mt-5">
+
+            <a class="nav-link text-danger"
+               href="#"
+               onclick="logout()">
+
+                🔌 Déconnexion
+
+            </a>
+
+        </li>
+
+    </ul>
+
+</nav>
         
         <!-- Main Content -->
         <main class="main-content">
+        
+    <div class="tab-content">
             <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="tab-pane fade show active"
+     id="deployment">
                 <h2>Tableau de bord Opérateur</h2>
                 <div class="badge bg-primary fs-6 p-2">Namespace : <span id="ns-display">...</span></div>
             </div>
@@ -74,6 +129,71 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+        <div class="tab-pane fade"
+     id="validation">
+
+    <h3 class="mb-4">
+        Validation Réseau
+    </h3>
+
+    <div class="alert alert-info">
+
+        Cette section permettra :
+
+        <ul>
+
+            <li>Ping UE</li>
+
+            <li>DNS Test</li>
+
+            <li>HTTP Test</li>
+
+            <li>iperf3</li>
+
+            <li>Logs</li>
+
+        </ul>
+
+    </div>
+
+</div>
+
+<div class="tab-pane fade"
+     id="operations">
+
+    <h3 class="mb-4">
+
+        Opérations Réseau
+
+    </h3>
+
+    <div class="alert alert-warning">
+
+        Gestion des Network Functions
+
+    </div>
+
+</div>
+
+<div class="tab-pane fade"
+     id="monitoring">
+
+    <h3 class="mb-4">
+
+        Monitoring
+
+    </h3>
+
+    <div class="alert alert-success">
+
+        Prometheus / Grafana
+
+    </div>
+
+</div>
+
+</div>
         </main>
     </div>
 
