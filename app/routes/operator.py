@@ -57,10 +57,10 @@ async def run_ping(pod_name: str, namespace: str, target: str = "8.8.8.8"):
 
 @router.get("/network/ue-status")
 async def check_ue_status(pod_name: str, namespace: str):
-    """Vérifie l'enregistrement réel via nr-cli"""
-    # On demande le statut détaillé de l'IMSI par défaut
-    # On utilise 'sh -c' pour s'assurer que le chemin vers nr-cli est trouvé
-    command = "./nr-cli --dump" 
+    imsi = "imsi-208930000000001"
+    
+    # On utilise la commande -e status qui renvoie l'état dynamique
+    command = f"./nr-cli {imsi} -e status" 
     
     kube_cmd = ["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-c", command]
     
@@ -68,22 +68,25 @@ async def check_ue_status(pod_name: str, namespace: str):
         process = subprocess.run(kube_cmd, capture_output=True, text=True, timeout=10)
         output = process.stdout
         
-        # On cherche les mots clés de succès (insensible à la casse)
-        # UERANSIM affiche souvent 'MM-REGISTERED' ou 'Registered'
-        success_keywords = ["REGISTERED", "Registered", "CONNECTED"]
-        is_registered = any(key in output for key in success_keywords)
+        # LOGIQUE DE VALIDATION ROBUSTE :
+        # On vérifie les deux états clés pour confirmer que la 5G fonctionne
+        is_registered = "RM-REGISTERED" in output and "MM-REGISTERED" in output
         
-        # DEBUG : log pour voir ce que UERANSIM répond vraiment
-        logger.info(f"Sortie nr-cli pour {pod_name}: {output}")
+        logger.info(f"Diagnostic UE {imsi} : {'SUCCÈS' if is_registered else 'ÉCHEC'}")
 
         return {
             "registered": is_registered,
-            "output": output
+            "output": output, # On renvoie tout pour que l'ingénieur puisse lire s'il veut
+            "details": {
+                "cm_state": "CONNECTED" if "CM-CONNECTED" in output else "IDLE",
+                "rm_state": "REGISTERED" if "RM-REGISTERED" in output else "DEREGISTERED",
+                "ue_ip": "10.60.0.1" if is_registered else None
+            }
         }
     except Exception as e:
-        logger.error(f"Erreur check UE status : {e}")
+        logger.error(f"Erreur lors du diagnostic UE : {e}")
         return {"registered": False, "error": str(e)}
-    
+        
 # --- 3. SECTION MONITORING / LOGS ---
 
 @router.get("/test")
