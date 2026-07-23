@@ -242,67 +242,74 @@
     }
 
     // Fonction pour le Ping Réel
+// --- FONCTION PING RÉEL ---
 async function runPingTest() {
-    const target = document.getElementById('ping-target').value;
+    const target = document.getElementById('ping-target').value || "8.8.8.8";
     const term = document.getElementById('ping-terminal');
-    term.innerHTML = "⏳ Connexion au pod UE... Lancement du ping sur l'interface uesimtun0...";
     
+    term.innerHTML = `<span style="color: #60a5fa;">⏳ Recherche du pod UE dans le namespace ${ns}...</span>`;
+
     try {
-        // 1. On cherche d'abord le nom exact du pod UE dans le namespace
+        // 1. Trouver le nom du pod UE automatiquement
         const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
         const podsData = await podsRes.json();
         const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
 
         if (!uePod) {
-            term.innerHTML = "<span class='text-danger'>❌ Erreur : Pod UERANSIM-UE introuvable. Vérifiez le déploiement.</span>";
+            term.innerHTML = `<span style="color: #ef4444;">❌ Erreur : Pod UERANSIM-UE introuvable. Vérifiez que l'antenne est déployée.</span>`;
             return;
         }
 
-        // 2. On appelle notre API de ping
+        term.innerHTML += `\n<span style="color: #60a5fa;">⏳ Pod trouvé : ${uePod.name}</span>`;
+        term.innerHTML += `\n<span style="color: #60a5fa;">⏳ Exécution : ping -I uesimtun0 ${target}...</span>\n\n`;
+
+        // 2. Appeler la route de ping réelle
         const res = await fetch(`/api/operator/network/ping?pod_name=${uePod.name}&namespace=${ns}&target=${target}`);
         const data = await res.json();
-        
+
         if (data.status === "success") {
-            term.innerHTML = `<span class='text-info'>> kubectl exec ${uePod.name} -- ping -I uesimtun0 ${target}</span>\n\n` + 
-                             data.stdout + 
-                             "\n\n<span class='text-success'>✅ CONNECTIVITÉ 5G VALIDÉE</span>";
+            // On affiche le résultat du ping dans le terminal
+            term.innerHTML = `<span style="color: #10b981;">> ping -I uesimtun0 ${target}</span>\n` + data.stdout;
+            term.innerHTML += `\n\n<span style="color: #10b981; font-weight: bold;">✅ TEST DE CONNECTIVITÉ RÉUSSI</span>`;
         } else {
-            term.innerHTML = "<span class='text-danger'>❌ ÉCHEC DU TEST :\n</span>" + (data.stderr || data.message);
+            term.innerHTML = `<span style="color: #ef4444;">❌ ÉCHEC DU PING :</span>\n` + (data.stderr || "L'interface uesimtun0 est absente.");
         }
     } catch (e) {
-        term.innerHTML = "<span class='text-danger'>❌ Erreur de communication avec le backend.</span>";
+        term.innerHTML = `<span style="color: #ef4444;">❌ Erreur de connexion avec l'orchestrateur.</span>`;
     }
 }
 
-// Fonction pour l'enregistrement UE
+// --- FONCTION VÉRIFIER ENREGISTREMENT ---
 async function checkRegistration() {
-    const badge = document.getElementById('ue-status');
-    badge.innerHTML = "⏳ Vérification...";
-    
+    const statusBox = document.getElementById('ue-status');
+    statusBox.innerHTML = "⏳ Analyse de la signalisation...";
+    statusBox.className = "alert alert-info";
+
     try {
         const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
         const podsData = await podsRes.json();
         const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
 
-        if (!uePod) { badge.innerHTML = "Pod non trouvé"; return; }
+        if (!uePod) {
+            statusBox.innerHTML = "❌ Pod UE non trouvé";
+            statusBox.className = "alert alert-danger";
+            return;
+        }
 
         const res = await fetch(`/api/operator/network/ue-status?pod_name=${uePod.name}&namespace=${ns}`);
         const data = await res.json();
-        
+
         if (data.registered) {
-            badge.className = "alert alert-success";
-            badge.innerHTML = "✅ UE Enregistré (IMSI actif sur le cœur 5G)";
+            statusBox.innerHTML = "✅ UE ENREGISTRÉ (IMSI authentifié via 5G AKA)";
+            statusBox.className = "alert alert-success";
         } else {
-            badge.className = "alert alert-danger";
-            badge.innerHTML = "❌ UE non attaché. Vérifiez les logs AMF.";
+            statusBox.innerHTML = "❌ UE NON ENREGISTRÉ (Échec d'attachement)";
+            statusBox.className = "alert alert-warning";
         }
-    } catch (e) { badge.innerHTML = "Erreur backend"; }
+    } catch (e) {
+        statusBox.innerHTML = "❌ Erreur backend";
+    }
 }
-
-    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
-
-    setInterval(refreshPods, 5000);
-    refreshPods();
     </script>
 </body>
 </html>
