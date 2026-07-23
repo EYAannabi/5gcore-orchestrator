@@ -57,22 +57,33 @@ async def run_ping(pod_name: str, namespace: str, target: str = "8.8.8.8"):
 
 @router.get("/network/ue-status")
 async def check_ue_status(pod_name: str, namespace: str):
-    """Vérifie l'enregistrement IMSI via l'outil nr-cli d'UERANSIM"""
-    # On utilise l'outil interne d'UERANSIM pour voir si l'UE est 'Registered'
+    """Vérifie l'enregistrement réel via nr-cli"""
+    # On demande le statut détaillé de l'IMSI par défaut
+    # On utilise 'sh -c' pour s'assurer que le chemin vers nr-cli est trouvé
     command = "./nr-cli --dump" 
+    
     kube_cmd = ["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-c", command]
     
     try:
         process = subprocess.run(kube_cmd, capture_output=True, text=True, timeout=10)
-        is_registered = "Registered" in process.stdout
+        output = process.stdout
+        
+        # On cherche les mots clés de succès (insensible à la casse)
+        # UERANSIM affiche souvent 'MM-REGISTERED' ou 'Registered'
+        success_keywords = ["REGISTERED", "Registered", "CONNECTED"]
+        is_registered = any(key in output for key in success_keywords)
+        
+        # DEBUG : log pour voir ce que UERANSIM répond vraiment
+        logger.info(f"Sortie nr-cli pour {pod_name}: {output}")
+
         return {
             "registered": is_registered,
-            "output": process.stdout
+            "output": output
         }
     except Exception as e:
         logger.error(f"Erreur check UE status : {e}")
         return {"registered": False, "error": str(e)}
-
+    
 # --- 3. SECTION MONITORING / LOGS ---
 
 @router.get("/test")
