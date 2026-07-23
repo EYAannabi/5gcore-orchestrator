@@ -6,7 +6,7 @@
     <title>Portail Opérateur - 5G Core Orchestrator</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body { background: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }
         .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 250px; z-index: 1000; }
         .main-content { margin-left: 250px; padding: 2rem; width: calc(100% - 250px); }
         .nav-link { color: #cbd5e1; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: 0.3s; border: none; background: none; text-align: left; width: 100%; }
@@ -14,14 +14,13 @@
         .nav-link.active { background: #2563eb !important; color: white !important; font-weight: bold; }
         .logo-container { background: white; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 80px; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
-        .status-badge { font-weight: 600; padding: 0.5em 0.8em; }
-        .terminal { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; min-height: 150px; }
+        .terminal { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; min-height: 200px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
     <div class="container-fluid p-0">
         <!-- Sidebar -->
-        <nav class="sidebar">
+        <nav class="sidebar shadow">
             <div class="text-center mb-4">
                 <div class="logo-container">
                     <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 60px; object-fit: contain;">
@@ -49,7 +48,6 @@
             </ul>
         </nav>
         
-        <!-- Main Content -->
         <main class="main-content">
             <div class="tab-content" id="operatorTabContent">
                 
@@ -81,38 +79,36 @@
                     <div class="card overflow-hidden">
                         <table class="table table-hover mb-0">
                             <thead class="table-dark">
-                                <tr>
-                                    <th>Network Function (NF)</th>
-                                    <th>Statut</th>
-                                    <th>Adresse IP Interne</th>
-                                </tr>
+                                <tr><th>Network Function (NF)</th><th>Statut</th><th>IP Interne</th></tr>
                             </thead>
                             <tbody id="pods-table">
-                                <tr><td colspan="3" class="text-center p-4">Aucun service détecté.</td></tr>
+                                <tr><td colspan="3" class="text-center p-4">Initialisation...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- 2. ONGLET VALIDATION -->
+                <!-- 2. ONGLET VALIDATION (C'EST ICI QUE CA BLOQUAIT) -->
                 <div class="tab-pane fade" id="validation" role="tabpanel">
                     <h3 class="mb-4">🧪 Validation & Diagnostics Réseau</h3>
                     <div class="row g-4">
-                        <div class="col-md-6">
+                        <div class="col-md-7">
                             <div class="card h-100 p-4">
                                 <h5>🌐 Test de Connectivité (Ping)</h5>
                                 <div class="input-group mb-3">
                                     <span class="input-group-text">ping -I uesimtun0</span>
+                                    <!-- ID CORRIGÉ : ping-target -->
                                     <input type="text" id="ping-target" class="form-control" value="8.8.8.8">
-                                    <button class="btn btn-success" onclick="simulatePing()">Tester</button>
+                                    <button class="btn btn-success" onclick="runPingTest()">Tester</button>
                                 </div>
                                 <div id="ping-terminal" class="terminal">> Prêt pour le test...</div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-5">
                             <div class="card h-100 p-4">
                                 <h5>📡 État d'attachement UE</h5>
-                                <button class="btn btn-outline-primary mb-3" onclick="checkUERegistration()">Vérifier Enregistrement</button>
+                                <p class="text-muted small">Vérification de l'IMSI sur l'AMF.</p>
+                                <button class="btn btn-outline-primary mb-3" onclick="checkRegistration()">Vérifier Enregistrement</button>
                                 <div id="ue-status" class="alert alert-secondary">Statut : Non testé</div>
                             </div>
                         </div>
@@ -121,47 +117,34 @@
 
                 <!-- 3. ONGLET OPÉRATIONS -->
                 <div class="tab-pane fade" id="operations" role="tabpanel">
-                    <h3 class="mb-4 text-dark">⚙️ Opérations Réseau & Pipeline CI/CD</h3>
+                    <h3 class="mb-4">⚙️ Opérations CI/CD</h3>
                     <div class="card p-4">
-                        <div class="fw-bold mb-3">🚀 Upscaling Intelligent (Zéro Downtime)</div>
-                        <p>Modifier la capacité du réseau existant via un pipeline automatisé.</p>
-                        <div class="row align-items-end">
+                        <h5>🚀 Upscaling Intelligent</h5>
+                        <div class="row align-items-end mt-3">
                             <div class="col-md-4">
                                 <label class="form-label">Nouvelle Capacité</label>
                                 <input type="number" id="new-capacity" class="form-control" value="2000">
                             </div>
                             <div class="col-md-4">
-                                <button class="btn btn-warning w-100" onclick="triggerPipeline()">Lancer le Pipeline</button>
+                                <button class="btn btn-warning w-100" onclick="triggerPipeline()">Lancer Pipeline</button>
                             </div>
                         </div>
-                        
                         <div id="pipeline-status" class="mt-4" style="display:none;">
-                            <h6>Progression du Pipeline CI/CD :</h6>
                             <div class="list-group">
                                 <div class="list-group-item" id="step-1">1. Création Sandbox de test <span class="status-icon"></span></div>
                                 <div class="list-group-item" id="step-2">2. Validation Network & iperf3 <span class="status-icon"></span></div>
-                                <div class="list-group-item" id="step-3">3. Upgrade Production (Rolling Update) <span class="status-icon"></span></div>
+                                <div class="list-group-item" id="step-3">3. Upgrade Production (0 Downtime) <span class="status-icon"></span></div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- 4. ONGLET MONITORING -->
-                <div class="tab-pane fade" id="monitoring" role="tabpanel">
-                    <h3 class="mb-4">📊 Monitoring Temps Réel</h3>
-                    <div class="alert alert-info">Accès aux métriques détaillées de l'opérateur via Prometheus.</div>
-                    <div class="card p-5 text-center text-muted">
-                        L'intégration du dashboard Grafana spécifique à l'opérateur est en cours...
-                    </div>
-                </div>
-
             </div>
         </main>
     </div>
 
+    <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // 1. Session & Init
     const username = localStorage.getItem('username');
     const ns = localStorage.getItem('namespace');
     const logo = localStorage.getItem('user_logo');
@@ -172,7 +155,55 @@
     document.getElementById('ns-display').innerText = ns;
     document.getElementById('operator-logo').src = "/static/assets/" + (logo || "default.png");
 
-    // 2. Déploiement
+    // --- FONCTION PING REEL ---
+    async function runPingTest() {
+        const target = document.getElementById('ping-target').value;
+        const term = document.getElementById('ping-terminal');
+        term.innerHTML = "⏳ Connexion au Pod UE...\n⏳ Exécution : ping -I uesimtun0 " + target + " ...";
+
+        try {
+            const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+            const data = await podsRes.json();
+            const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
+
+            if (!uePod) {
+                term.innerHTML = "❌ Erreur : Pod UE introuvable.";
+                return;
+            }
+
+            const res = await fetch(`/api/operator/network/ping?pod_name=${uePod.name}&namespace=${ns}&target=${target}`);
+            const result = await res.json();
+            term.innerHTML = `<span style="color: #00ff00;">> ping -I uesimtun0 ${target}</span>\n` + result.stdout;
+        } catch (e) {
+            term.innerHTML = "❌ Erreur de communication serveur.";
+        }
+    }
+
+    // --- FONCTION REGISTRATION REELLE ---
+    async function checkRegistration() {
+        const badge = document.getElementById('ue-status');
+        badge.innerHTML = "⏳ Vérification...";
+        try {
+            const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+            const data = await podsRes.json();
+            const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
+
+            if (!uePod) { badge.innerHTML = "Pod UE introuvable"; return; }
+
+            const res = await fetch(`/api/operator/network/ue-status?pod_name=${uePod.name}&namespace=${ns}`);
+            const regData = await res.json();
+            
+            if (regData.registered) {
+                badge.className = "alert alert-success";
+                badge.innerHTML = "✅ UE Enregistré (Session Active)";
+            } else {
+                badge.className = "alert alert-danger";
+                badge.innerHTML = "❌ UE non enregistré";
+            }
+        } catch (e) { badge.innerHTML = "Erreur backend"; }
+    }
+
+    // --- DÉPLOIEMENT ---
     async function handleDeploy() {
         const site = document.getElementById('site-name').value || "site";
         const payload = {
@@ -183,133 +214,38 @@
             mcc: "208", mnc: "93", num_upf_replicas: 1, num_smf_replicas: 1, num_amf_replicas: 1,
             slice_type: "eMBB", deployment_mode: "development"
         };
-
-        const btn = document.getElementById('deploy-btn');
-        btn.disabled = true;
-        btn.innerText = "Déploiement en cours...";
-
         try {
             const res = await fetch('/api/core/deploy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
-            alert(res.ok ? "✅ Succès: " + data.message : "❌ Erreur");
-        } catch (e) { alert("❌ Erreur de connexion"); }
-        finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
+            alert(res.ok ? "✅ Déploiement lancé !" : "❌ Erreur");
+        } catch (e) { alert("Erreur réseau"); }
     }
 
-    // 3. Rafraîchir Pods
+    // --- REFRESH PODS ---
     async function refreshPods() {
         try {
             const res = await fetch(`/api/status/pods?namespace=${ns}`);
             const data = await res.json();
             const tbody = document.getElementById('pods-table');
-            if (!data.pods || data.pods.length === 0) return;
-
-            tbody.innerHTML = data.pods.map(pod => `
-                <tr>
-                    <td><span class="fw-bold">${pod.name}</span></td>
-                    <td><span class="badge ${pod.status === 'Running' ? 'bg-success' : 'bg-warning'}">${pod.status}</span></td>
-                    <td><code>${pod.ip || 'Allocation...'}</code></td>
-                </tr>
-            `).join('');
+            if (data.pods.length > 0) {
+                tbody.innerHTML = data.pods.map(p => `
+                    <tr><td>${p.name}</td><td><span class="badge ${p.status==='Running'?'bg-success':'bg-warning'}">${p.status}</span></td><td>${p.ip||'-'}</td></tr>
+                `).join('');
+            }
         } catch (e) {}
     }
 
-    // 4. Simulateur Pipeline CI/CD (Pour la démo)
     function triggerPipeline() {
-        const div = document.getElementById('pipeline-status');
-        div.style.display = 'block';
-        const steps = ['step-1', 'step-2', 'step-3'];
-        let current = 0;
-
-        const interval = setInterval(() => {
-            if(current > 0) {
-                document.getElementById(steps[current-1]).classList.add('list-group-item-success');
-                document.getElementById(steps[current-1]).querySelector('.status-icon').innerHTML = '✅';
-            }
-            if(current < steps.length) {
-                document.getElementById(steps[current]).classList.add('list-group-item-primary');
-                document.getElementById(steps[current]).querySelector('.status-icon').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-                current++;
-            } else {
-                clearInterval(interval);
-                alert("🚀 Pipeline terminé : Le réseau a été mis à jour avec 0 interruption !");
-            }
-        }, 3000);
+        document.getElementById('pipeline-status').style.display = 'block';
+        alert("Pipeline de mise à jour simulé lancé !");
     }
 
-    // Fonction pour le Ping Réel
-// --- FONCTION PING RÉEL ---
-async function runPingTest() {
-    const target = document.getElementById('ping-target').value || "8.8.8.8";
-    const term = document.getElementById('ping-terminal');
-    
-    term.innerHTML = `<span style="color: #60a5fa;">⏳ Recherche du pod UE dans le namespace ${ns}...</span>`;
-
-    try {
-        // 1. Trouver le nom du pod UE automatiquement
-        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
-        const podsData = await podsRes.json();
-        const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
-
-        if (!uePod) {
-            term.innerHTML = `<span style="color: #ef4444;">❌ Erreur : Pod UERANSIM-UE introuvable. Vérifiez que l'antenne est déployée.</span>`;
-            return;
-        }
-
-        term.innerHTML += `\n<span style="color: #60a5fa;">⏳ Pod trouvé : ${uePod.name}</span>`;
-        term.innerHTML += `\n<span style="color: #60a5fa;">⏳ Exécution : ping -I uesimtun0 ${target}...</span>\n\n`;
-
-        // 2. Appeler la route de ping réelle
-        const res = await fetch(`/api/operator/network/ping?pod_name=${uePod.name}&namespace=${ns}&target=${target}`);
-        const data = await res.json();
-
-        if (data.status === "success") {
-            // On affiche le résultat du ping dans le terminal
-            term.innerHTML = `<span style="color: #10b981;">> ping -I uesimtun0 ${target}</span>\n` + data.stdout;
-            term.innerHTML += `\n\n<span style="color: #10b981; font-weight: bold;">✅ TEST DE CONNECTIVITÉ RÉUSSI</span>`;
-        } else {
-            term.innerHTML = `<span style="color: #ef4444;">❌ ÉCHEC DU PING :</span>\n` + (data.stderr || "L'interface uesimtun0 est absente.");
-        }
-    } catch (e) {
-        term.innerHTML = `<span style="color: #ef4444;">❌ Erreur de connexion avec l'orchestrateur.</span>`;
-    }
-}
-
-// --- FONCTION VÉRIFIER ENREGISTREMENT ---
-async function checkRegistration() {
-    const statusBox = document.getElementById('ue-status');
-    statusBox.innerHTML = "⏳ Analyse de la signalisation...";
-    statusBox.className = "alert alert-info";
-
-    try {
-        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
-        const podsData = await podsRes.json();
-        const uePod = podsData.pods.find(p => p.name.includes("ueransim-ue"));
-
-        if (!uePod) {
-            statusBox.innerHTML = "❌ Pod UE non trouvé";
-            statusBox.className = "alert alert-danger";
-            return;
-        }
-
-        const res = await fetch(`/api/operator/network/ue-status?pod_name=${uePod.name}&namespace=${ns}`);
-        const data = await res.json();
-
-        if (data.registered) {
-            statusBox.innerHTML = "✅ UE ENREGISTRÉ (IMSI authentifié via 5G AKA)";
-            statusBox.className = "alert alert-success";
-        } else {
-            statusBox.innerHTML = "❌ UE NON ENREGISTRÉ (Échec d'attachement)";
-            statusBox.className = "alert alert-warning";
-        }
-    } catch (e) {
-        statusBox.innerHTML = "❌ Erreur backend";
-    }
-}
+    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+    setInterval(refreshPods, 5000);
+    refreshPods();
     </script>
 </body>
 </html>
