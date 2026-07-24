@@ -2,129 +2,141 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HUAWEI 5G - Infrastructure Monitoring</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #0b0f1a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
-        .topbar { background: #d71921; padding: 15px; font-weight: bold; border-bottom: 4px solid #a01419; }
-        .sidebar { background: #161b22; min-height: 100vh; border-right: 1px solid #30363d; }
-        .card-custom { background: #1c2128; border: 1px solid #30363d; border-radius: 8px; padding: 20px; height: 100%; }
-        .stat-value { font-size: 2.5rem; font-weight: 800; color: #f85149; }
-        .stat-label { color: #8b949e; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
-        .table-dark-custom { background: #1c2128; color: white; border-radius: 8px; overflow: hidden; }
-        .status-running { color: #3fb950; font-weight: bold; }
-        .status-pending { color: #d29922; font-weight: bold; }
-        .status-critical { color: #f85149; font-weight: bold; }
-        canvas { max-height: 200px; }
+        body { background: #0b0f1a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .topbar { background: #d71921; padding: 10px 25px; font-weight: bold; border-bottom: 4px solid #a01419; }
+        .huawei-logo { height: 40px; margin-right: 15px; }
+        .card-custom { background: #1c2128; border: 1px solid #30363d; border-radius: 12px; padding: 20px; height: 100%; transition: 0.3s; }
+        .card-custom:hover { border-color: #d71921; transform: translateY(-3px); }
+        .stat-value { font-size: 2.2rem; font-weight: 800; color: #ffffff; }
+        .stat-label { color: #8b949e; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1.2px; margin-bottom: 5px; }
+        .table-dark-custom { background: #1c2128; border-radius: 12px; overflow: hidden; }
+        .op-logo-sm { width: 24px; height: 24px; object-fit: contain; margin-right: 10px; background: white; border-radius: 4px; padding: 2px; }
+        .status-running { color: #3fb950; }
+        .status-pending { color: #d29922; }
+        iframe { border: 2px solid #30363d; border-radius: 12px; background: #1c2128; min-height: 650px; margin-top: 10px; }
+        .btn-huawei { background: #d71921; color: white; border: none; }
+        .btn-huawei:hover { background: #b0141a; color: white; }
     </style>
 </head>
 <body>
 
+<!-- Topbar avec Logo Huawei -->
 <div class="topbar d-flex justify-content-between align-items-center shadow">
-    <span>🛰️ HUAWEI 5G CORE ORCHESTRATOR - INFRASTRUCTURE ADMIN</span>
-    <div>
-        <span class="badge bg-dark border border-secondary me-3">K3S CLUSTER: READY</span>
+    <div class="d-flex align-items-center">
+        <img src="/static/assets/huawei.png" alt="Huawei" class="huawei-logo">
+        <span class="fs-5 tracking-tight">5G CORE ORCHESTRATOR - GLOBAL NOC</span>
+    </div>
+    <div class="d-flex align-items-center">
+        <span class="badge bg-success me-3">CLUSTER HEALTHY</span>
         <button onclick="logout()" class="btn btn-sm btn-outline-light">Déconnexion</button>
     </div>
 </div>
 
-<div class="container-fluid">
-    <div class="row mt-4">
-        <!-- Cartes Statistiques -->
+<div class="container-fluid px-4">
+    <!-- Ligne des Cartes Stat -->
+    <div class="row mt-4 g-3">
         <div class="col-md-2">
             <div class="card-custom">
                 <div class="stat-label">Opérateurs</div>
-                <div class="stat-value" id="count-operators">0</div>
+                <div class="stat-value text-danger" id="count-operators">0</div>
             </div>
         </div>
         <div class="col-md-2">
-            <div class="card-custom text-center">
-                <div class="stat-label">Nodes Ready</div>
+            <div class="card-custom">
+                <div class="stat-label">Nodes K3s</div>
                 <div class="stat-value text-success" id="count-nodes">0/0</div>
             </div>
         </div>
         <div class="col-md-2">
-            <div class="card-custom text-center">
+            <div class="card-custom">
                 <div class="stat-label">Pods Running</div>
                 <div class="stat-value text-info" id="count-pods-running">0</div>
             </div>
         </div>
         <div class="col-md-2">
-            <div class="card-custom text-center">
+            <div class="card-custom">
                 <div class="stat-label">Pods Pending</div>
                 <div class="stat-value text-warning" id="count-pods-pending">0</div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card-custom">
-                <div class="stat-label">Santé du Cluster</div>
-                <div class="stat-value" id="cluster-health">...</div>
+            <div class="card-custom border-start border-danger border-5">
+                <div class="stat-label">Statut Infrastructure</div>
+                <div class="stat-value" id="cluster-health" style="font-size: 1.8rem;">Analyse...</div>
             </div>
         </div>
     </div>
 
+    <!-- Section Principale : Tableau et Graphique -->
     <div class="row mt-4">
-        <!-- Tableau des Opérateurs -->
         <div class="col-md-8">
             <div class="card-custom">
-                <h5 class="mb-4 text-primary">Gestion des Réseaux Opérateurs</h5>
-                <table class="table table-dark table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Opérateur</th>
-                            <th>Namespace</th>
-                            <th>Pods</th>
-                            <th>État</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="operators-table-body">
-                        <!-- Rempli par JS -->
-                    </tbody>
-                </table>
+                <h6 class="mb-4 text-white fw-bold">Gestion des Tranches Réseau (Network Slices)</h6>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr class="text-secondary" style="font-size: 0.8rem;">
+                                <th>OPÉRATEUR</th>
+                                <th>NAMESPACE</th>
+                                <th>RESOURCES</th>
+                                <th>STATUT</th>
+                                <th>ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="operators-table-body" style="font-size: 0.9rem;">
+                            <!-- Rempli par JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
         
-        <!-- Graphiques rapides -->
         <div class="col-md-4">
             <div class="card-custom">
-                <h5 class="mb-3">Distribution des Pods</h5>
+                <h6 class="mb-3 text-white fw-bold">Distribution des Pods</h6>
                 <canvas id="podsChart"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- Iframe Grafana -->
+    <!-- Section Grafana -->
     <div class="row mt-4 mb-5">
         <div class="col-12">
-            <div class="card-custom p-0">
-                <div class="p-3 border-bottom border-secondary d-flex justify-content-between">
-                    <h5>Supervision Temps Réel (Prometheus / Grafana)</h5>
-                    <button onclick="refreshGrafana()" class="btn btn-xs btn-outline-primary">Rafraîchir Frame</button>
+            <div class="card-custom p-0 overflow-hidden">
+                <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold">Supervision Temps Réel (Prometheus / Grafana)</h6>
+                    <span class="badge bg-dark text-info">Mode Kiosk : Activé</span>
                 </div>
-                <iframe id="grafana-frame" src="" width="100%" height="600" style="border:none;"></iframe>
+                <iframe id="grafana-frame" src="" width="100%" height="650"></iframe>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // 1. Configuration dynamique de l'URL Grafana
+    // 1. Config Grafana
     const host = window.location.hostname;
-    // Ton UID exact récupéré depuis Grafana
     const dashboardUID = "85a562078cdf77779eaa1add43ccec1e";
-    
-    // URL formatée pour l'intégration (Mode Kiosk pour cacher les menus)
     const grafanaUrl = `http://${host}:30000/d/${dashboardUID}/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&kiosk`;
-    
     document.getElementById('grafana-frame').src = grafanaUrl;
 
     let podsChart;
 
+    // Mapping des logos
+    const logoMap = {
+        "orange": "Orange_logo.svg.webp",
+        "ooredoo": "Ooredoo.svg",
+        "tunisie-telecom": "LOGO_TT_.jpg"
+    };
+
     async function fetchData() {
         try {
-            // 1. Overview - Stats globales du cluster
+            // A. Stats Globales
             const resOverview = await fetch('/api/admin/overview');
             const data = await resOverview.json();
             
@@ -132,33 +144,53 @@
             document.getElementById('count-nodes').innerText = data.nodes_ready;
             document.getElementById('count-pods-running').innerText = data.pods_running;
             document.getElementById('count-pods-pending').innerText = data.pods_pending;
-            
-            const healthEl = document.getElementById('cluster-health');
-            healthEl.innerText = data.cluster_status;
-            healthEl.className = `stat-value ${data.cluster_status === 'Healthy' ? 'text-success' : 'text-warning'}`;
+            document.getElementById('cluster-health').innerText = data.cluster_status.toUpperCase();
+            document.getElementById('cluster-health').className = `stat-value ${data.cluster_status === 'Healthy' ? 'text-success' : 'text-danger'}`;
 
-            // Mise à jour du graphique circulaire (Doughnut)
             updateChart(data.pods_running, data.pods_pending, data.pods_failed || 0);
 
-            // 2. Operators Table - Liste des réseaux déployés
+            // B. Liste des Opérateurs
             const resOps = await fetch('/api/admin/operators');
             const ops = await resOps.json();
             const tbody = document.getElementById('operators-table-body');
             
-            tbody.innerHTML = ops.map(op => `
-                <tr>
-                    <td><img src="/static/assets/default.png" style="width:20px; margin-right:8px;"> <strong>${op.name}</strong></td>
-                    <td><code>${op.namespace}</code></td>
-                    <td><span class="badge bg-secondary">${op.running_count} / ${op.pod_count} Pods</span></td>
-                    <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">● ${op.status}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" onclick="window.open('${op.webui_url}')">Accès WebUI</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.deployment_name}', '${op.namespace}')">Supprimer</button>
-                    </td>
-                </tr>
-            `).join('');
+            if (ops.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">Aucun réseau actif détecté.</td></tr>';
+            } else {
+                tbody.innerHTML = ops.map(op => {
+                    const opLower = op.name.toLowerCase();
+                    const logoFile = logoMap[opLower] || "default.png";
+                    
+                    // Calcul dynamique du port WebUI
+                    let port = 30500;
+                    if (opLower.includes("orange")) port = 30600;
+                    else if (opLower.includes("tunisie") || opLower.includes("tt")) port = 30700;
+                    else if (opLower.includes("ooredoo")) port = 30800;
 
-        } catch (e) { console.error("Erreur de rafraîchissement des données Admin:", e); }
+                    return `
+                    <tr>
+                        <td>
+                            <img src="/static/assets/${logoFile}" class="op-logo-sm">
+                            <span class="fw-bold">${op.name}</span>
+                        </td>
+                        <td><code class="text-info">${op.namespace}</code></td>
+                        <td>
+                            <div class="progress" style="height: 6px; width: 100px; background: #30363d;">
+                                <div class="progress-bar bg-info" style="width: ${(op.running_count/op.pod_count)*100}%"></div>
+                            </div>
+                            <small class="text-muted">${op.running_count}/${op.pod_count} Pods</small>
+                        </td>
+                        <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">● ${op.status}</span></td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-light" onclick="window.open('http://${host}:${port}')">WebUI</button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.deployment_name}', '${op.namespace}')">Supprimer</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            }
+        } catch (e) { console.error("Admin Fetch Error:", e); }
     }
 
     function updateChart(running, pending, failed) {
@@ -171,44 +203,29 @@
                 datasets: [{
                     data: [running, pending, failed],
                     backgroundColor: ['#3fb950', '#d29922', '#f85149'],
-                    hoverOffset: 4,
                     borderWidth: 0
                 }]
             },
             options: { 
-                cutout: '70%',
-                plugins: { legend: { position: 'bottom', labels: { color: '#8b949e' } } } 
+                cutout: '75%',
+                plugins: { legend: { position: 'bottom', labels: { color: '#8b949e', boxWidth: 12 } } } 
             }
         });
     }
 
     async function deleteNetwork(deploymentName, ns) {
-    if (confirm(`⚠️ Voulez-vous vraiment supprimer la release '${deploymentName}' dans ${ns} ?`)) {
-        try {
-            const res = await fetch(`/api/core/clean?deployment_name=${deploymentName}&namespace=${ns}`, { method: 'DELETE' });
-            if (res.ok) {
-                alert("✅ Réseau supprimé avec succès.");
-                fetchData();
-            } else {
-                alert("❌ Erreur lors de la suppression.");
-            }
-        } catch (e) { alert("❌ Erreur de connexion au serveur."); }
-    }
-}
-
-    function refreshGrafana() {
-        const frame = document.getElementById('grafana-frame');
-        frame.src = frame.src; // Force le rechargement de l'iframe
+        if (confirm(`⚠️ Voulez-vous vraiment supprimer la release '${deploymentName}' ?`)) {
+            try {
+                const res = await fetch(`/api/core/clean?deployment_name=${deploymentName}&namespace=${ns}`, { method: 'DELETE' });
+                if (res.ok) { fetchData(); }
+            } catch (e) { alert("Erreur serveur."); }
+        }
     }
 
-    function logout() { 
-        localStorage.clear(); 
-        window.location.href = 'login.html'; 
-    }
+    function logout() { localStorage.clear(); window.location.href = 'login.html'; }
 
-    // Intervalle de mise à jour (5 secondes)
     setInterval(fetchData, 5000);
-    fetchData(); // Premier appel au chargement
+    fetchData();
 </script>
 </body>
 </html>
