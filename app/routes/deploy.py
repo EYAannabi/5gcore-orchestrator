@@ -7,8 +7,9 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 from app.services.helm_service import (
     deploy_free5gc, 
-    clean_free5gc, 
-    build_helm_values
+    build_helm_values,
+    # On va utiliser une nouvelle fonction de nettoyage complet
+    clean_operator_environment 
 )
 from app.services.kubernetes_service import check_deployment_status
 from app.models.deployment import DeploymentConfig, DeploymentResponse, DeploymentStatus
@@ -23,16 +24,13 @@ async def deploy(config: DeploymentConfig):
     Déploie un cœur 5G isolé pour Orange, Ooredoo ou Tunisie Telecom.
     """
     try:
-        # 1. Logs de traçabilité (Audit Trail)
         logger.info(f"--- Requête de déploiement NetDevOps ---")
-        logger.info(f"Utilisateur: {config.operator_name}")
-        logger.info(f"Namespace: {config.namespace}")
+        logger.info(f"Utilisateur: {config.operator_name} | Namespace: {config.namespace}")
         
-        # 2. Préparation des paramètres Helm
+        # Préparation des paramètres Helm (Smart Sizing + Port Mapping)
         helm_values = build_helm_values(config)
         
-        # 3. Exécution du déploiement
-        # On utilise create_namespace=True pour automatiser la création des espaces isolés
+        # Exécution du déploiement du Cœur
         success, stdout, stderr = deploy_free5gc(
             deployment_name=config.deployment_name,
             namespace=config.namespace,
@@ -42,52 +40,53 @@ async def deploy(config: DeploymentConfig):
         )
         
         if success:
-            logger.info(f"✅ Réseau 5G déployé pour {config.operator_name}")
+            logger.info(f"✅ Réseau 5G '{config.deployment_name}' initialisé pour {config.operator_name}")
             return DeploymentResponse(
                 status="Success",
-                message=f"Réseau 5G de {config.operator_name} (Site: {config.deployment_name}) initialisé.",
+                message=f"Le réseau de {config.operator_name} (Site: {config.deployment_name}) est en cours de création.",
                 deployment_name=config.deployment_name,
                 namespace=config.namespace,
-                output="Helm install completed successfully"
+                output="Helm deployment triggered successfully"
             )
         else:
-            logger.error(f"❌ Échec Helm pour {config.operator_name}: {stderr}")
+            logger.error(f"❌ Échec Helm : {stderr}")
             raise HTTPException(status_code=400, detail=f"Erreur Helm: {stderr}")
     
     except Exception as e:
         logger.error(f"💥 Erreur Critique Deploy: {str(e)}")
-        # C'est ici que l'erreur 'operator_name' disparaîtra après avoir mis à jour le modèle
         raise HTTPException(status_code=500, detail=f"Erreur Interne: {str(e)}")
 
 @router.delete("/clean", response_model=DeploymentResponse)
 async def clean(
-    deployment_name: str = Query(..., description="Nom de la release"), 
-    namespace: str = Query(..., description="Namespace de l'opérateur")
+    namespace: str = Query(..., description="Namespace de l'opérateur à nettoyer totalement")
 ):
     """
-    Supprime proprement le réseau d'un opérateur sans toucher aux autres.
+    Nettoyage Radical : Supprime TOUTES les releases (Cœur + RAN) et le NAMESPACE.
+    C'est ce qui permet de libérer les ressources et de faire disparaître l'opérateur du Dashboard Admin.
     """
     try:
-        logger.info(f"Nettoyage demandé par l'opérateur dans {namespace}")
-        success, stdout, stderr = clean_free5gc(deployment_name, namespace)
+        logger.info(f"🗑️ Nettoyage TOTAL demandé pour le namespace : {namespace}")
+        
+        # Appel de la fonction de nettoyage global (Core + UERANSIM + NS)
+        success, message = clean_operator_environment(namespace)
         
         if success:
             return DeploymentResponse(
                 status="Success",
-                message=f"Le réseau {deployment_name} a été supprimé du namespace {namespace}.",
-                output=stdout
+                message=message,
+                namespace=namespace
             )
         else:
-            if "not found" in stderr.lower():
-                return DeploymentResponse(status="Success", message="Réseau déjà inexistant.")
-            raise HTTPException(status_code=400, detail=stderr)
+            raise HTTPException(status_code=400, detail=message)
+            
     except Exception as e:
+        logger.error(f"💥 Erreur lors du nettoyage : {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status", response_model=DeploymentStatus)
 async def get_status(namespace: str = Query(..., description="Namespace à surveiller")):
     """
-    Retourne l'état des Pods pour l'opérateur connecté.
+    Retourne l'état des microservices pour l'opérateur.
     """
     try:
         status_data = check_deployment_status(namespace=namespace)

@@ -298,3 +298,20 @@ def deploy_ueransim(site_name, operator_ns):
         "--set", f"global.n3network.masterIf=ens33"
     ]
     # ... exécution de la commande
+def clean_operator_environment(namespace: str) -> Tuple[bool, str]:
+    """Désinstalle tout et supprime le namespace (NetDevOps Clean)"""
+    try:
+        # 1. Désinstaller toutes les releases Helm du namespace (Core + RAN)
+        # On ne se soucie plus du nom, on balaye tout.
+        subprocess.run(f"helm uninstall $(helm list -n {namespace} -q) -n {namespace}", shell=True, capture_output=True)
+        
+        # 2. Supprimer les PVC restants (les disques MongoDB)
+        subprocess.run(f"kubectl delete pvc --all -n {namespace}", shell=True, capture_output=True)
+        
+        # 3. Supprimer le NAMESPACE lui-même
+        # C'est ce qui fera passer le compteur du Dashboard Admin de 1 à 0
+        subprocess.run(f"kubectl delete ns {namespace} --force --grace-period=0", shell=True, capture_output=True)
+        
+        return True, f"L'environnement {namespace} a été entièrement effacé."
+    except Exception as e:
+        return False, str(e)
