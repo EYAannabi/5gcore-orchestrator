@@ -104,14 +104,37 @@
                                 <div id="ping-terminal" class="terminal">> Prêt pour le test...</div>
                             </div>
                         </div>
-                        <div class="col-md-5">
-                            <div class="card h-100 p-4">
-                                <h5>📡 État d'attachement UE</h5>
-                                <p class="text-muted small">Vérification de l'IMSI sur l'AMF.</p>
-                                <button class="btn btn-outline-primary mb-3" onclick="checkRegistration()">Vérifier Enregistrement</button>
-                                <div id="ue-status" class="alert alert-secondary">Statut : Non testé</div>
-                            </div>
-                        </div>
+                        <div class="card h-100 p-4">
+    <h5>📡 Network Health Report</h5>
+    <button class="btn btn-primary mb-3" onclick="runFullDiagnostic()">Lancer Diagnostic Complet</button>
+    
+    <div class="row g-2" id="diag-results">
+        <div class="col-6">
+            <div class="p-2 border rounded bg-white">
+                <small class="text-muted d-block">Status</small>
+                <strong id="health-status">-</strong>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="p-2 border rounded bg-white">
+                <small class="text-muted d-block">IP 5G (tun0)</small>
+                <strong id="health-ip">-</strong>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="p-2 border rounded bg-white">
+                <small class="text-muted d-block">PLMN</small>
+                <strong id="health-plmn">-</strong>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="p-2 border rounded bg-white">
+                <small class="text-muted d-block">DNS Resolve</small>
+                <strong id="health-dns">-</strong>
+            </div>
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
 
@@ -246,6 +269,26 @@
     function logout() { localStorage.clear(); window.location.href = 'login.html'; }
     setInterval(refreshPods, 5000);
     refreshPods();
+    async function runFullDiagnostic() {
+    // 1. Trouver le pod
+    const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+    const data = await podsRes.json();
+    const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
+
+    if (!uePod) return alert("Pod UE introuvable");
+
+    // 2. Appeler le diagnostic
+    const res = await fetch(`/api/operator/network/diagnostic-full?pod_name=${uePod.name}&namespace=${ns}`);
+    const diag = await res.json();
+
+    // 3. Mettre à jour l'UI
+    document.getElementById('health-status').innerText = diag.registration;
+    document.getElementById('health-status').className = diag.registration === "REGISTERED" ? "text-success" : "text-danger";
+    
+    document.getElementById('health-ip').innerText = diag.ue_ip;
+    document.getElementById('health-plmn').innerText = diag.plmn;
+    document.getElementById('health-dns').innerText = diag.dns;
+}
     </script>
 </body>
 </html>

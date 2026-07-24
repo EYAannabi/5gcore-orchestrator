@@ -3,6 +3,7 @@ import subprocess
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from app.services import deployment_orchestrator
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +94,31 @@ async def check_ue_status(pod_name: str, namespace: str):
 async def operator_test(deployment_name: str, namespace: str):
     """Verdict de santé global (utilisé pour le statut résumé du dashboard)"""
     return await deployment_orchestrator.test_network(deployment_name, namespace)
+@router.get("/network/diagnostic-full")
+async def diagnostic_full(pod_name: str, namespace: str):
+    """Effectue une batterie de tests et extrait les données techniques"""
+    results = {}
+    
+    # 1. Commande d'état (nr-cli)
+    cmd_status = f"./nr-cli imsi-208930000000001 -e status"
+    exec_status = subprocess.run(["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-c", cmd_status], capture_output=True, text=True)
+    
+    if exec_status.returncode == 0:
+        out = exec_status.stdout
+        results["registration"] = "REGISTERED" if "MM-REGISTERED" in out else "DEREGISTERED"
+        # Extraction du PLMN via Regex
+        plmn = re.search(r"selected-plmn: (.*)", out)
+        results["plmn"] = plmn.group(1) if plmn else "N/A"
+    
+    # 2. Test DNS
+    cmd_dns = "nslookup google.com"
+    exec_dns = subprocess.run(["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-c", cmd_dns], capture_output=True, text=True)
+    results["dns"] = "SUCCESS" if exec_dns.returncode == 0 else "FAILED"
+
+    # 3. Récupération de l'IP 5G réelle (uesimtun0)
+    cmd_ip = "ip addr show uesimtun0"
+    exec_ip = subprocess.run(["kubectl", "exec", "-n", namespace, pod_name, "--", "sh", "-c", cmd_ip], capture_output=True, text=True)
+    ip_match = re.search(r"inet (.*)/", exec_ip.stdout)
+    results["ue_ip"] = ip_match.group(1) if ip_match else "No IP"
+
+    return results
