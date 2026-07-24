@@ -153,7 +153,7 @@
                     <td><span class="${op.status === 'Running' ? 'status-running' : 'status-pending'}">● ${op.status}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-info" onclick="window.open('${op.webui_url}')">Accès WebUI</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.name}', '${op.namespace}')">Supprimer</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNetwork('${op.deployment_name}', '${op.namespace}')">Supprimer</button>
                     </td>
                 </tr>
             `).join('');
@@ -182,17 +182,19 @@
         });
     }
 
-    async function deleteNetwork(name, ns) {
-        if (confirm(`⚠️ ATTENTION : Voulez-vous vraiment supprimer le réseau de ${name} ?`)) {
-            try {
-                const res = await fetch(`/api/core/clean?deployment_name=${name.toLowerCase()}-core&namespace=${ns}`, { method: 'DELETE' });
-                if (res.ok) {
-                    alert("Réseau supprimé avec succès.");
-                    fetchData();
-                }
-            } catch (e) { alert("Erreur lors de la suppression."); }
-        }
+    async function deleteNetwork(deploymentName, ns) {
+    if (confirm(`⚠️ Voulez-vous vraiment supprimer la release '${deploymentName}' dans ${ns} ?`)) {
+        try {
+            const res = await fetch(`/api/core/clean?deployment_name=${deploymentName}&namespace=${ns}`, { method: 'DELETE' });
+            if (res.ok) {
+                alert("✅ Réseau supprimé avec succès.");
+                fetchData();
+            } else {
+                alert("❌ Erreur lors de la suppression.");
+            }
+        } catch (e) { alert("❌ Erreur de connexion au serveur."); }
     }
+}
 
     function refreshGrafana() {
         const frame = document.getElementById('grafana-frame');

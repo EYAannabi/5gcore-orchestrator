@@ -556,10 +556,7 @@ def get_all_pods_stats():
     return stats
 
 def get_operator_status_detailed():
-    """Génère les données pour le tableau des opérateurs (Phase 3)"""
     v1 = client.CoreV1Api()
-    apps_v1 = client.AppsV1Api()
-    
     operators = get_operator_namespaces()
     detailed_list = []
     
@@ -567,17 +564,25 @@ def get_operator_status_detailed():
         pods = v1.list_namespaced_pod(ns).items
         running_pods = [p for p in pods if p.status.phase == "Running"]
         
-        # On détermine un statut global pour l'opérateur
+        # Récupérer le préfixe/nom de release depuis le premier pod trouvé
+        deployment_name = "free5gc-helm"
+        if len(pods) > 0:
+            # Ex: si le pod s'appelle 'sousse-core-free5gc-amf-...', on extrait 'sousse-core'
+            first_pod = pods[0].metadata.name
+            if "-free5gc-" in first_pod:
+                deployment_name = first_pod.split("-free5gc-")[0]
+
         status = "Running" if len(running_pods) == len(pods) and len(pods) > 0 else "Degraded"
         if len(pods) == 0: status = "Stopped"
         
         detailed_list.append({
             "name": ns.replace("-5g", "").upper(),
             "namespace": ns,
+            "deployment_name": deployment_name, # <--- ON AJOUTE LE VRAI NOM
             "pod_count": len(pods),
             "running_count": len(running_pods),
             "status": status,
-            "webui_url": f"http://192.168.140.128:30500" # Sera dynamique plus tard
+            "webui_url": f"http://192.168.140.128:30600"
         })
     return detailed_list
 
