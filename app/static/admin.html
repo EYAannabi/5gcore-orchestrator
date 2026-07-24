@@ -28,7 +28,7 @@
 <!-- Topbar avec Logo Huawei -->
 <div class="topbar d-flex justify-content-between align-items-center shadow">
     <div class="d-flex align-items-center">
-        <img src="static\assets\Huawei_Standard_logo.svg.webp" alt="Huawei" class="huawei-logo">
+        <img src="/static/assets/Huawei_Standard_logo.svg.webp" alt="Huawei" class="huawei-logo">
         <span class="fs-5 tracking-tight">5G CORE ORCHESTRATOR - GLOBAL NOC</span>
     </div>
     <div class="d-flex align-items-center">
@@ -129,10 +129,11 @@
 
     // Mapping des logos
     const logoMap = {
-        "orange": "Orange_logo.svg.webp",
-        "ooredoo": "Ooredoo.svg",
-        "tunisie-telecom": "LOGO_TT_.jpg"
-    };
+    "orange": "Orange_logo.svg.webp",
+    "ooredoo": "Ooredoo.svg",
+    "tunisie-telecom": "LOGO_TT_.jpg",
+    "tt": "LOGO_TT_.jpg" // Ajout de "tt" au cas où
+};
 
     async function fetchData() {
         try {

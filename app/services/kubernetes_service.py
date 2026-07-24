@@ -6,6 +6,8 @@ Handles pod management, node information, and cluster status.
 import logging
 from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
+import subprocess
+import json 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
