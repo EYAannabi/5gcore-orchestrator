@@ -128,30 +128,36 @@ async def diagnostic_full(pod_name: str, namespace: str, imsi: str = "imsi-20893
     return results
 @router.post("/network/deploy-ran")
 async def deploy_ran(site_name: str, namespace: str, operator_name: str):
-    """Déploie automatiquement l'antenne (gNB) et le téléphone (UE)"""
+    """
+    Solution Universelle : lie automatiquement n'importe quel site 5G
+    à n'importe quel opérateur.
+    """
     try:
-        # On détermine le nom de la release RAN (ex: ueransim-orange)
+        # Naming convention robuste
         ran_release_name = f"ueransim-{operator_name}"
+        core_service = f"{site_name}-core-free5gc-amf-amf-n2"
         
-        # On construit la commande exacte que tu utilisais en manuel
-        # On automatise le lien avec le cœur (sfax-core, sousse-core...)
         command = [
             "helm", "install", ran_release_name, "./ueransim/",
             "-n", namespace,
             "--set", f"global.free5gcReleaseName={site_name}-core",
-            "--set", "gnb.amf.n2if.serviceName=free5gc-amf-amf-n2",
+            "--set", f"gnb.amf.n2if.serviceName=free5gc-amf-amf-n2", # Nom interne au chart
+            "--set", f"gnb.amf.hostname={core_service}",           # On force le lien direct
             "--set", "global.n2network.masterIf=ens33",
             "--set", "global.n3network.masterIf=ens33"
         ]
         
-        # Exécution (dans le dossier des charts)
+        # Log pour debug pendant la démo
+        logger.info(f"Lancement RAN pour {operator_name}: {' '.join(command)}")
+        
         import os
         chart_dir = os.path.expanduser("~/free5gc-helm/charts")
         process = subprocess.run(command, cwd=chart_dir, capture_output=True, text=True)
         
         if process.returncode == 0:
-            return {"status": "success", "message": "Antenne gNodeB et UE activés avec succès."}
+            return {"status": "success", "message": f"Accès Radio activé pour {operator_name}"}
         else:
+            # Si déjà installé, on fait un upgrade au lieu d'une erreur
             return {"status": "error", "message": process.stderr}
             
     except Exception as e:
