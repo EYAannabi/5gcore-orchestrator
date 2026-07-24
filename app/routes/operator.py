@@ -126,3 +126,33 @@ async def diagnostic_full(pod_name: str, namespace: str, imsi: str = "imsi-20893
 
     results["plmn"] = "208/93" # Peut être extrait via Regex aussi
     return results
+@router.post("/network/deploy-ran")
+async def deploy_ran(site_name: str, namespace: str, operator_name: str):
+    """Déploie automatiquement l'antenne (gNB) et le téléphone (UE)"""
+    try:
+        # On détermine le nom de la release RAN (ex: ueransim-orange)
+        ran_release_name = f"ueransim-{operator_name}"
+        
+        # On construit la commande exacte que tu utilisais en manuel
+        # On automatise le lien avec le cœur (sfax-core, sousse-core...)
+        command = [
+            "helm", "install", ran_release_name, "./ueransim/",
+            "-n", namespace,
+            "--set", f"global.free5gcReleaseName={site_name}-core",
+            "--set", "gnb.amf.n2if.serviceName=free5gc-amf-amf-n2",
+            "--set", "global.n2network.masterIf=ens33",
+            "--set", "global.n3network.masterIf=ens33"
+        ]
+        
+        # Exécution (dans le dossier des charts)
+        import os
+        chart_dir = os.path.expanduser("~/free5gc-helm/charts")
+        process = subprocess.run(command, cwd=chart_dir, capture_output=True, text=True)
+        
+        if process.returncode == 0:
+            return {"status": "success", "message": "Antenne gNodeB et UE activés avec succès."}
+        else:
+            return {"status": "error", "message": process.stderr}
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
