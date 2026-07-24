@@ -561,28 +561,41 @@ def get_operator_status_detailed():
     detailed_list = []
     
     for ns in operators:
+        # 1. Récupérer le vrai nom de la release Helm dans ce namespace
+        # C'est la seule méthode 100% fiable
+        deployment_name = "free5gc-helm" # Valeur par défaut
+        try:
+            helm_list = subprocess.run(
+                ["helm", "list", "-n", ns, "-o", "json"],
+                capture_output=True, text=True
+            )
+            releases = json.loads(helm_list.stdout)
+            if len(releases) > 0:
+                deployment_name = releases[0]['name']
+        except Exception as e:
+            logger.error(f"Erreur Helm list pour {ns}: {e}")
+
+        # 2. Récupérer les pods
         pods = v1.list_namespaced_pod(ns).items
         running_pods = [p for p in pods if p.status.phase == "Running"]
         
-        # Récupérer le préfixe/nom de release depuis le premier pod trouvé
-        deployment_name = "free5gc-helm"
-        if len(pods) > 0:
-            # Ex: si le pod s'appelle 'sousse-core-free5gc-amf-...', on extrait 'sousse-core'
-            first_pod = pods[0].metadata.name
-            if "-free5gc-" in first_pod:
-                deployment_name = first_pod.split("-free5gc-")[0]
-
         status = "Running" if len(running_pods) == len(pods) and len(pods) > 0 else "Degraded"
         if len(pods) == 0: status = "Stopped"
         
+        # 3. Calcul du port WebUI
+        port = 30500
+        if "orange" in ns: port = 30600
+        elif "tt" in ns or "tunisie" in ns: port = 30700
+        elif "ooredoo" in ns: port = 30800
+
         detailed_list.append({
             "name": ns.replace("-5g", "").upper(),
             "namespace": ns,
-            "deployment_name": deployment_name, # <--- ON AJOUTE LE VRAI NOM
+            "deployment_name": deployment_name, 
             "pod_count": len(pods),
             "running_count": len(running_pods),
             "status": status,
-            "webui_url": f"http://192.168.140.128:30600"
+            "webui_url": f"http://192.168.140.128:{port}"
         })
     return detailed_list
 
