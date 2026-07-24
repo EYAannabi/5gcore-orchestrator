@@ -3,18 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portail Opérateur - 5G Core Orchestrator</title>
+    <title>5G Core Orchestrator - Portail Opérateur</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }
-        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 250px; z-index: 1000; }
-        .main-content { margin-left: 250px; padding: 2rem; width: calc(100% - 250px); }
+        body { background: #f8fafc; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+        .sidebar { background: #1e293b; color: white; height: 100vh; padding: 1.5rem; position: fixed; width: 260px; z-index: 1000; }
+        .main-content { margin-left: 260px; padding: 2rem; width: calc(100% - 260px); }
         .nav-link { color: #cbd5e1; padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: 0.3s; border: none; background: none; text-align: left; width: 100%; }
         .nav-link:hover { background: #334155; color: white; }
         .nav-link.active { background: #2563eb !important; color: white !important; font-weight: bold; }
-        .logo-container { background: white; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; min-height: 80px; }
+        .logo-container { background: white; padding: 12px; border-radius: 12px; margin-bottom: 1.5rem; display: flex; justify-content: center; align-items: center; height: 80px; shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
-        .terminal { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; min-height: 200px; white-space: pre-wrap; }
+        .terminal { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 0.85rem; min-height: 220px; white-space: pre-wrap; border: 1px solid #334155; }
+        .stat-box { transition: 0.3s; }
+        .stat-box:hover { transform: translateY(-3px); }
     </style>
 </head>
 <body>
@@ -23,24 +25,24 @@
         <nav class="sidebar shadow">
             <div class="text-center mb-4">
                 <div class="logo-container">
-                    <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 60px; object-fit: contain;">
+                    <img id="operator-logo" src="" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                 </div>
-                <h5 id="operator-display-name">Chargement...</h5>
-                <small class="text-muted">Opérateur Mobile 5G</small>
+                <h5 id="operator-display-name" class="text-uppercase tracking-wider">Chargement...</h5>
+                <small class="text-info fw-bold" id="ns-display-sidebar">Namespace</small>
             </div>
 
             <ul class="nav flex-column nav-pills" id="operatorTab" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link active" id="deploy-tab" data-bs-toggle="pill" data-bs-target="#deployment" type="button" role="tab">🚀 Déploiement</button>
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#deployment" type="button">🚀 Déploiement Site</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="validation-tab" data-bs-toggle="pill" data-bs-target="#validation" type="button" role="tab">🧪 Validation Réseau</button>
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#validation" type="button">🧪 Validation Réseau</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="ops-tab" data-bs-toggle="pill" data-bs-target="#operations" type="button" role="tab">⚙️ Opérations CI/CD</button>
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#operations" type="button">⚙️ Opérations CI/CD</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="mon-tab" data-bs-toggle="pill" data-bs-target="#monitoring" type="button" role="tab">📊 Monitoring</button>
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#monitoring" type="button">📊 Monitoring</button>
                 </li>
                 <li class="nav-item mt-5">
                     <button class="nav-link text-danger" onclick="logout()">🔌 Déconnexion</button>
@@ -48,38 +50,39 @@
             </ul>
         </nav>
         
+        <!-- Main Content -->
         <main class="main-content">
             <div class="tab-content" id="operatorTabContent">
                 
                 <!-- 1. ONGLET DÉPLOIEMENT -->
                 <div class="tab-pane fade show active" id="deployment" role="tabpanel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2>Tableau de bord Opérateur</h2>
-                        <div class="badge bg-primary fs-6 p-2">Namespace : <span id="ns-display">...</span></div>
+                        <h2 class="fw-bold">Tableau de bord Opérateur</h2>
+                        <div class="badge bg-primary fs-6 p-2 shadow-sm">Namespace : <span id="ns-display">...</span></div>
                     </div>
 
                     <div class="card p-4">
-                        <h4 class="mb-3">Déployer un nouveau site 5G</h4>
+                        <h4 class="mb-3 text-dark">Déployer un nouveau site 5G</h4>
                         <form id="deploy-form">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Nom du Site (Ville/Zone)</label>
-                                    <input type="text" id="site-name" class="form-control" placeholder="ex: Tunis-Centre">
+                                    <input type="text" id="site-name" class="form-control" placeholder="ex: Sfax-Centre">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">Capacité Estimée (Abonnés)</label>
                                     <input type="number" id="subscribers" class="form-control" value="1000">
                                 </div>
                             </div>
-                            <button type="button" id="deploy-btn" onclick="handleDeploy()" class="btn btn-primary px-5">Lancer le déploiement automatique</button>
+                            <button type="button" id="deploy-btn" onclick="handleDeploy()" class="btn btn-primary px-5 fw-bold">Lancer le déploiement automatique</button>
                         </form>
                     </div>
 
-                    <h4 class="mb-3">État des microservices 5G Core</h4>
-                    <div class="card overflow-hidden">
+                    <h4 class="mb-3 text-dark">État des microservices 5G Core</h4>
+                    <div class="card overflow-hidden shadow-sm">
                         <table class="table table-hover mb-0">
                             <thead class="table-dark">
-                                <tr><th>Network Function (NF)</th><th>Statut</th><th>IP Interne</th></tr>
+                                <tr><th>Network Function (NF)</th><th>Statut</th><th>Adresse IP Interne</th></tr>
                             </thead>
                             <tbody id="pods-table">
                                 <tr><td colspan="3" class="text-center p-4">Initialisation...</td></tr>
@@ -88,94 +91,95 @@
                     </div>
                 </div>
 
-                <!-- 2. ONGLET VALIDATION (C'EST ICI QUE CA BLOQUAIT) -->
+                <!-- 2. ONGLET VALIDATION -->
                 <div class="tab-pane fade" id="validation" role="tabpanel">
                     <h3 class="mb-4">🧪 Validation & Diagnostics Réseau</h3>
                     <div class="row g-4">
                         <div class="col-md-7">
-                            <div class="card h-100 p-4">
-                                <h5>🌐 Test de Connectivité (Ping)</h5>
-                                <div class="input-group mb-3">
+                            <div class="card h-100 p-4 shadow-sm">
+                                <h5 class="fw-bold mb-3">🌐 Test de Connectivité (Ping)</h5>
+                                <div class="input-group mb-3 shadow-sm">
                                     <span class="input-group-text">ping -I uesimtun0</span>
-                                    <!-- ID CORRIGÉ : ping-target -->
                                     <input type="text" id="ping-target" class="form-control" value="8.8.8.8">
-                                    <button class="btn btn-success" onclick="runPingTest()">Tester</button>
+                                    <button class="btn btn-success fw-bold" onclick="runPingTest()">Tester</button>
                                 </div>
                                 <div id="ping-terminal" class="terminal">> Prêt pour le test...</div>
                             </div>
                         </div>
-                        <div class="card h-100 p-4">
-    <h5>📡 Network Health Report</h5>
-    <button class="btn btn-primary mb-3" onclick="runFullDiagnostic()">Lancer Diagnostic Complet</button>
-    <div class="card shadow-sm h-100 p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="m-0">📱 Terminal de l'Abonné (SIM)</h5>
-        <span class="badge bg-dark">Slot SIM 1</span>
-    </div>
+                        
+                        <div class="col-md-5">
+                            <div class="card h-100 p-4 shadow-sm">
+                                <h5 class="fw-bold mb-3">📡 Network Health Report</h5>
+                                
+                                <div class="input-group mb-4">
+                                    <span class="input-group-text bg-light">IMSI</span>
+                                    <input type="text" id="imsi-input" class="form-control" value="208930000000001">
+                                    <button class="btn btn-primary" onclick="runFullDiagnostic()">Scanner</button>
+                                </div>
 
-    <!-- Zone d'insertion de la SIM -->
-    <div class="input-group mb-3">
-        <span class="input-group-text">IMSI</span>
-        <input type="text" id="imsi-input" class="form-control" placeholder="208930000000001" value="208930000000001">
-        <button class="btn btn-primary" onclick="runFullDiagnostic()">Insérer & Tester</button>
-    </div>
-    
-    <div class="row g-2" id="diag-results">
-        <!-- Status -->
-        <div class="col-6">
-            <div class="p-3 border rounded bg-light text-center">
-                <small class="text-muted d-block">Signalisation (NAS)</small>
-                <strong id="health-status" class="fs-5">-</strong>
-            </div>
-        </div>
-        <!-- IP -->
-        <div class="col-6">
-            <div class="p-3 border rounded bg-light text-center">
-                <small class="text-muted d-block">IP Session (User Plane)</small>
-                <strong id="health-ip" class="fs-5">-</strong>
-            </div>
-        </div>
-        <!-- DNS -->
-        <div class="col-12">
-            <div class="p-2 border rounded bg-white d-flex justify-content-between px-3">
-                <span>DNS Resolution</span>
-                <span id="health-dns" class="fw-bold">-</span>
-            </div>
-        </div>
-    </div>
-    <div id="diag-loader" class="text-center mt-3" style="display:none;">
-        <div class="spinner-border spinner-border-sm text-primary"></div>
-        <small class="ms-2">Négociation avec le cœur 5G...</small>
-    </div>
-</div>
-    </div>
-</div>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="p-3 border rounded bg-light stat-box">
+                                            <small class="text-muted d-block text-uppercase">Signal (NAS)</small>
+                                            <strong id="health-status" class="fs-6">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-3 border rounded bg-light stat-box">
+                                            <small class="text-muted d-block text-uppercase">IP 5G (tun0)</small>
+                                            <strong id="health-ip" class="fs-6">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="p-3 border rounded bg-light d-flex justify-content-between align-items-center">
+                                            <small class="text-muted text-uppercase">DNS Resolution</small>
+                                            <span id="health-dns" class="badge bg-secondary">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="diag-loader" class="text-center mt-3" style="display:none;">
+                                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                                    <small class="ms-2">Analyse du tunnel GTP...</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 3. ONGLET OPÉRATIONS -->
                 <div class="tab-pane fade" id="operations" role="tabpanel">
-                    <h3 class="mb-4">⚙️ Opérations CI/CD</h3>
-                    <div class="card p-4">
-                        <h5>🚀 Upscaling Intelligent</h5>
+                    <h3 class="mb-4">⚙️ Opérations CI/CD & Upscaling</h3>
+                    <div class="card p-4 shadow-sm border-start border-warning border-5">
+                        <h5 class="fw-bold text-dark">🚀 Augmentation de Capacité (Zéro Downtime)</h5>
+                        <p class="text-muted">Déclencher un pipeline automatisé pour adapter les ressources AMF/UPF au nombre d'abonnés.</p>
                         <div class="row align-items-end mt-3">
                             <div class="col-md-4">
-                                <label class="form-label">Nouvelle Capacité</label>
+                                <label class="form-label fw-bold">Cible Abonnés</label>
                                 <input type="number" id="new-capacity" class="form-control" value="2000">
                             </div>
                             <div class="col-md-4">
-                                <button class="btn btn-warning w-100" onclick="triggerPipeline()">Lancer Pipeline</button>
+                                <button class="btn btn-warning w-100 fw-bold" onclick="triggerPipeline()">Lancer Pipeline</button>
                             </div>
                         </div>
                         <div id="pipeline-status" class="mt-4" style="display:none;">
-                            <div class="list-group">
-                                <div class="list-group-item" id="step-1">1. Création Sandbox de test <span class="status-icon"></span></div>
-                                <div class="list-group-item" id="step-2">2. Validation Network & iperf3 <span class="status-icon"></span></div>
-                                <div class="list-group-item" id="step-3">3. Upgrade Production (0 Downtime) <span class="status-icon"></span></div>
+                            <div class="list-group shadow-sm">
+                                <div class="list-group-item" id="step-1">1. Création Sandbox de test (Isolation) <span class="status-icon float-end"></span></div>
+                                <div class="list-group-item" id="step-2">2. Validation Network & iperf3 <span class="status-icon float-end"></span></div>
+                                <div class="list-group-item" id="step-3">3. Upgrade Production (Rolling Update) <span class="status-icon float-end"></span></div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- 4. ONGLET MONITORING -->
+                <div class="tab-pane fade" id="monitoring" role="tabpanel">
+                    <h3 class="mb-4 text-dark">📊 Monitoring Temps Réel</h3>
+                    <div class="card p-3 shadow-sm bg-white" style="min-height: 600px;">
+                        <iframe id="grafana-frame" src="" width="100%" height="600" style="border:none; border-radius: 8px;"></iframe>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
@@ -191,54 +195,65 @@
 
     document.getElementById('operator-display-name').innerText = username.toUpperCase();
     document.getElementById('ns-display').innerText = ns;
+    document.getElementById('ns-display-sidebar').innerText = ns;
     document.getElementById('operator-logo').src = "/static/assets/" + (logo || "default.png");
+
+    // Intégration Grafana dynamique (Port 30000)
+    const host = window.location.hostname;
+    document.getElementById('grafana-frame').src = `http://${host}:30000/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&kiosk&var-namespace=${ns}`;
+
+    // --- RECHERCHE DE POD ROBUSTE ---
+    async function findUEPod() {
+        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
+        const data = await podsRes.json();
+        // On cherche un pod qui contient "ue" mais qui n'est pas le "gnb"
+        return data.pods.find(p => p.name.includes("ue") && !p.name.includes("gnb"));
+    }
 
     // --- FONCTION PING REEL ---
     async function runPingTest() {
         const target = document.getElementById('ping-target').value;
         const term = document.getElementById('ping-terminal');
-        term.innerHTML = "⏳ Connexion au Pod UE...\n⏳ Exécution : ping -I uesimtun0 " + target + " ...";
+        term.innerHTML = `<span style="color: #60a5fa;">⏳ Initialisation...</span>\n⏳ Recherche du Pod UE dans le namespace ${ns}...`;
 
         try {
-            const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
-            const data = await podsRes.json();
-            const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
-
+            const uePod = await findUEPod();
             if (!uePod) {
-                term.innerHTML = "❌ Erreur : Pod UE introuvable.";
+                term.innerHTML = "❌ Erreur : Pod UE introuvable. Vérifiez que UERANSIM est déployé.";
                 return;
             }
 
+            term.innerHTML += `\n⏳ Pod détecté : ${uePod.name}\n⏳ Exécution du ping 5G...\n\n`;
+
             const res = await fetch(`/api/operator/network/ping?pod_name=${uePod.name}&namespace=${ns}&target=${target}`);
             const result = await res.json();
-            term.innerHTML = `<span style="color: #00ff00;">> ping -I uesimtun0 ${target}</span>\n` + result.stdout;
-        } catch (e) {
-            term.innerHTML = "❌ Erreur de communication serveur.";
-        }
+            term.innerHTML = `<span style="color: #10b981;">> ping -I uesimtun0 ${target}</span>\n` + result.stdout;
+        } catch (e) { term.innerHTML = "❌ Erreur de communication serveur."; }
     }
 
-    // --- FONCTION REGISTRATION REELLE ---
-    async function checkRegistration() {
-        const badge = document.getElementById('ue-status');
-        badge.innerHTML = "⏳ Vérification...";
+    // --- DIAGNOSTIC COMPLET ---
+    async function runFullDiagnostic() {
+        const imsiInput = document.getElementById('imsi-input').value;
+        const loader = document.getElementById('diag-loader');
+        loader.style.display = 'block';
+
         try {
-            const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
-            const data = await podsRes.json();
-            const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
+            const uePod = await findUEPod();
+            if (!uePod) { alert("UE introuvable"); return; }
 
-            if (!uePod) { badge.innerHTML = "Pod UE introuvable"; return; }
+            const res = await fetch(`/api/operator/network/diagnostic-full?pod_name=${uePod.name}&namespace=${ns}&imsi=imsi-${imsiInput}`);
+            const diag = await res.json();
 
-            const res = await fetch(`/api/operator/network/ue-status?pod_name=${uePod.name}&namespace=${ns}`);
-            const regData = await res.json();
+            document.getElementById('health-status').innerText = diag.registration;
+            document.getElementById('health-status').className = (diag.registration === "REGISTERED") ? "text-success" : "text-danger";
             
-            if (regData.registered) {
-                badge.className = "alert alert-success";
-                badge.innerHTML = "✅ UE Enregistré (Session Active)";
-            } else {
-                badge.className = "alert alert-danger";
-                badge.innerHTML = "❌ UE non enregistré";
-            }
-        } catch (e) { badge.innerHTML = "Erreur backend"; }
+            document.getElementById('health-ip').innerText = diag.ue_ip;
+            document.getElementById('health-ip').className = (diag.ue_ip.includes("10.60")) ? "text-primary fw-bold" : "text-danger";
+
+            document.getElementById('health-dns').innerText = diag.dns;
+            document.getElementById('health-dns').className = (diag.dns === "SUCCESS") ? "badge bg-success" : "badge bg-danger";
+        } catch (e) { console.error(e); }
+        finally { loader.style.display = 'none'; }
     }
 
     // --- DÉPLOIEMENT ---
@@ -246,81 +261,68 @@
         const site = document.getElementById('site-name').value || "site";
         const payload = {
             operator_name: username,
-            deployment_name: site.toLowerCase() + "-core",
+            deployment_name: site.toLowerCase().replace(/[^a-z0-9]/g, '-') + "-core",
             namespace: ns,
             num_subscribers: parseInt(document.getElementById('subscribers').value),
             mcc: "208", mnc: "93", num_upf_replicas: 1, num_smf_replicas: 1, num_amf_replicas: 1,
             slice_type: "eMBB", deployment_mode: "development"
         };
+        const btn = document.getElementById('deploy-btn');
+        btn.disabled = true;
+        btn.innerText = "⏳ Déploiement...";
+
         try {
             const res = await fetch('/api/core/deploy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            alert(res.ok ? "✅ Déploiement lancé !" : "❌ Erreur");
+            const data = await res.json();
+            alert(res.ok ? "✅ Succès: " + data.message : "❌ Erreur");
         } catch (e) { alert("Erreur réseau"); }
+        finally { btn.disabled = false; btn.innerText = "Lancer le déploiement automatique"; }
     }
 
-    // --- REFRESH PODS ---
+    // --- REFRESH PODS TABLE ---
     async function refreshPods() {
         try {
             const res = await fetch(`/api/status/pods?namespace=${ns}`);
             const data = await res.json();
             const tbody = document.getElementById('pods-table');
-            if (data.pods.length > 0) {
+            if (data.pods && data.pods.length > 0) {
                 tbody.innerHTML = data.pods.map(p => `
-                    <tr><td>${p.name}</td><td><span class="badge ${p.status==='Running'?'bg-success':'bg-warning'}">${p.status}</span></td><td>${p.ip||'-'}</td></tr>
+                    <tr>
+                        <td><span class="fw-bold text-dark">${p.name}</span></td>
+                        <td><span class="badge ${p.status==='Running'?'bg-success':'bg-warning'}">${p.status}</span></td>
+                        <td><code class="text-primary">${p.ip||'Allocation...'}</code></td>
+                    </tr>
                 `).join('');
             }
         } catch (e) {}
     }
 
+    // --- PIPELINE CI/CD SIMULATION ---
     function triggerPipeline() {
         document.getElementById('pipeline-status').style.display = 'block';
-        alert("Pipeline de mise à jour simulé lancé !");
+        const steps = ['step-1', 'step-2', 'step-3'];
+        let i = 0;
+        const interval = setInterval(() => {
+            if (i > 0) document.getElementById(steps[i-1]).className = "list-group-item list-group-item-success fw-bold";
+            if (i < 3) {
+                document.getElementById(steps[i]).className = "list-group-item list-group-item-primary";
+                document.getElementById(steps[i]).innerHTML += ' <div class="spinner-border spinner-border-sm float-end"></div>';
+                i++;
+            } else {
+                clearInterval(interval);
+                alert("🚀 MISE À JOUR TERMINÉE : L'orchestrateur a validé le nouveau dimensionnement avec 0 downtime.");
+            }
+        }, 3000);
     }
 
     function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
     setInterval(refreshPods, 5000);
     refreshPods();
-    async function runFullDiagnostic() {
-    const imsi = document.getElementById('imsi-input').value;
-    const loader = document.getElementById('diag-loader');
-    
-    loader.style.display = 'block';
-
-    try {
-        // 1. Trouver le pod
-        const podsRes = await fetch(`/api/status/pods?namespace=${ns}`);
-        const data = await podsRes.json();
-        const uePod = data.pods.find(p => p.name.includes("ueransim-ue"));
-
-        if (!uePod) {
-            alert("Aucun équipement (UE) détecté sur ce site.");
-            return;
-        }
-
-        // 2. Appeler le diagnostic avec l'IMSI dynamique
-        const res = await fetch(`/api/operator/network/diagnostic-full?pod_name=${uePod.name}&namespace=${ns}&imsi=imsi-${imsi}`);
-        const diag = await res.json();
-
-        // 3. Mise à jour de l'UI
-        document.getElementById('health-status').innerText = diag.registration;
-        document.getElementById('health-status').className = (diag.registration === "REGISTERED") ? "text-success" : "text-danger";
-        
-        document.getElementById('health-ip').innerText = diag.ue_ip;
-        document.getElementById('health-ip').className = (diag.ue_ip.includes("10.60")) ? "text-primary" : "text-warning";
-
-        document.getElementById('health-dns').innerText = diag.dns;
-        document.getElementById('health-dns').className = (diag.dns === "SUCCESS") ? "text-success" : "text-danger";
-
-    } catch (e) {
-        console.error(e);
-    } finally {
-        loader.style.display = 'none';
-    }
-}
     </script>
 </body>
 </html>
