@@ -331,23 +331,27 @@
     refreshPods();
     async function handleDeployRAN() {
     const btn = document.getElementById('btn-ran');
-    // On récupère le nom du site depuis l'input du premier onglet
     const siteName = document.getElementById('site-name').value || "site";
     
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Initialisation Radio...';
 
     try {
-        const res = await fetch(`/api/operator/network/deploy-ran?site_name=${siteName.toLowerCase()}&namespace=${ns}&operator_name=${username}`);
+        // AJOUT DE LA MÉTHODE POST ICI
+        const res = await fetch(`/api/operator/network/deploy-ran?site_name=${siteName.toLowerCase()}&namespace=${ns}&operator_name=${username}`, {
+            method: 'POST' 
+        });
+        
         const data = await res.json();
         
-        if (data.status === "success") {
+        if (res.ok && data.status === "success") {
             alert("🚀 Antenne 5G activée ! Les microservices RAN sont en cours de démarrage.");
         } else {
-            alert("❌ Erreur : " + data.message);
+            // Utilise data.detail ou data.message selon ce que renvoie ton backend
+            alert("❌ Erreur : " + (data.message || data.detail || "Échec de l'installation"));
         }
     } catch (e) {
-        alert("Erreur de connexion au serveur.");
+        alert("❌ Erreur de connexion au serveur.");
     } finally {
         btn.disabled = false;
         btn.innerText = "Activer l'antenne et le terminal UE";
